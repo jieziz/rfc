@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # =============================================================================
-# WHCMS Auto Grabber - Linux Debian 一键部署脚本
-# 支持 Debian/Ubuntu 系统的自动化部署和启动
+# RFC Auto Grabber - 智能部署脚本
+# 支持从GitHub自动拉取代码并交互式配置启动
 # =============================================================================
 
 set -e  # 遇到错误立即退出
@@ -17,8 +17,10 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # 项目信息
-PROJECT_NAME="WHCMS Auto Grabber"
+PROJECT_NAME="RFC Auto Grabber"
+GITHUB_REPO="https://github.com/jieziz/rfc.git"
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$PROJECT_DIR/rfc_repo"
 PYTHON_VERSION="3.8"
 VENV_DIR="$PROJECT_DIR/venv"
 LOG_FILE="$PROJECT_DIR/deploy.log"
@@ -53,172 +55,218 @@ check_root() {
     fi
 }
 
-# 检查系统类型
+# 检查系统类型和必要工具
 check_system() {
     print_step "检查系统环境..."
-    
-    if [[ -f /etc/debian_version ]]; then
-        OS="debian"
-        print_success "检测到 Debian/Ubuntu 系统"
+
+    # 检查操作系统
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        if [[ -f /etc/debian_version ]]; then
+            OS="debian"
+            print_success "检测到 Debian/Ubuntu 系统"
+        elif [[ -f /etc/redhat-release ]]; then
+            OS="redhat"
+            print_success "检测到 RedHat/CentOS 系统"
+        else
+            OS="linux"
+            print_success "检测到 Linux 系统"
+        fi
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
+        OS="windows"
+        print_success "检测到 Windows 系统 (Git Bash/Cygwin)"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        OS="macos"
+        print_success "检测到 macOS 系统"
     else
-        print_error "此脚本仅支持 Debian/Ubuntu 系统"
-        exit 1
+        OS="unknown"
+        print_warning "未知系统类型: $OSTYPE"
     fi
-    
+
     # 检查架构
     ARCH=$(uname -m)
     print_info "系统架构: $ARCH"
-    
+
+    # 检查必要工具
+    check_dependencies
+
     log "系统检查完成: $OS, $ARCH"
 }
 
-# 更新系统包
-update_system() {
-    print_step "更新系统包列表..."
-    
-    if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get update -qq
-        print_success "系统包列表更新完成"
+# 检查必要的依赖工具
+check_dependencies() {
+    print_step "检查必要工具..."
+
+    local missing_tools=()
+
+    # 检查 git
+    if ! command -v git >/dev/null 2>&1; then
+        missing_tools+=("git")
     else
-        print_error "未找到 apt-get 包管理器"
+        print_success "Git 已安装: $(git --version)"
+    fi
+
+    # 检查 python3
+    if ! command -v python3 >/dev/null 2>&1; then
+        missing_tools+=("python3")
+    else
+        print_success "Python3 已安装: $(python3 --version)"
+    fi
+
+    # 检查 pip3
+    if ! command -v pip3 >/dev/null 2>&1; then
+        missing_tools+=("pip3")
+    else
+        print_success "Pip3 已安装: $(pip3 --version)"
+    fi
+
+    if [[ ${#missing_tools[@]} -gt 0 ]]; then
+        print_error "缺少必要工具: ${missing_tools[*]}"
+        print_info "请安装缺少的工具后重新运行脚本"
+
+        if [[ "$OS" == "debian" ]]; then
+            print_info "Ubuntu/Debian 安装命令:"
+            print_info "sudo apt update && sudo apt install -y git python3 python3-pip"
+        elif [[ "$OS" == "redhat" ]]; then
+            print_info "CentOS/RHEL 安装命令:"
+            print_info "sudo yum install -y git python3 python3-pip"
+        elif [[ "$OS" == "macos" ]]; then
+            print_info "macOS 安装命令:"
+            print_info "brew install git python3"
+        fi
+
         exit 1
     fi
-    
-    log "系统包更新完成"
+
+    print_success "所有必要工具已安装"
 }
 
-# 安装系统依赖
-install_system_dependencies() {
-    print_step "安装系统依赖包..."
-    
-    local packages=(
-        "python3"
-        "python3-pip"
-        "python3-venv"
-        "python3-dev"
-        "wget"
-        "curl"
-        "unzip"
-        "xvfb"
-        "fonts-liberation"
-        "libasound2"
-        "libatk-bridge2.0-0"
-        "libdrm2"
-        "libxcomposite1"
-        "libxdamage1"
-        "libxrandr2"
-        "libgbm1"
-        "libxss1"
-        "libnss3"
-        "libgconf-2-4"
-    )
-    
-    for package in "${packages[@]}"; do
-        if ! dpkg -l | grep -q "^ii  $package "; then
-            print_info "安装 $package..."
-            sudo apt-get install -y "$package" >/dev/null 2>&1
+# 克隆或更新GitHub仓库
+clone_or_update_repo() {
+    print_step "获取最新代码..."
+
+    if [[ -d "$REPO_DIR" ]]; then
+        print_info "仓库目录已存在，更新代码..."
+        cd "$REPO_DIR"
+
+        # 检查是否是git仓库
+        if [[ -d ".git" ]]; then
+            print_info "拉取最新代码..."
+            git fetch origin
+            git reset --hard origin/main 2>/dev/null || git reset --hard origin/master 2>/dev/null
+            print_success "代码更新完成"
         else
-            print_info "$package 已安装"
+            print_warning "目录存在但不是git仓库，重新克隆..."
+            cd "$PROJECT_DIR"
+            rm -rf "$REPO_DIR"
+            git clone "$GITHUB_REPO" "$REPO_DIR"
+            print_success "代码克隆完成"
+        fi
+    else
+        print_info "克隆仓库..."
+        git clone "$GITHUB_REPO" "$REPO_DIR"
+        print_success "代码克隆完成"
+    fi
+
+    # 检查克隆是否成功
+    if [[ ! -d "$REPO_DIR" ]]; then
+        print_error "代码获取失败"
+        exit 1
+    fi
+
+    cd "$REPO_DIR"
+    print_info "当前代码版本: $(git rev-parse --short HEAD)"
+
+    log "代码获取完成"
+}
+
+# 收集用户输入
+collect_user_input() {
+    print_step "收集用户配置信息..."
+
+    echo
+    print_info "请输入以下信息来配置抢购脚本："
+    echo
+
+    # 输入邮箱
+    while true; do
+        read -p "请输入您的邮箱账号: " USER_EMAIL
+        if [[ -n "$USER_EMAIL" && "$USER_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+            break
+        else
+            print_error "请输入有效的邮箱地址"
         fi
     done
-    
-    print_success "系统依赖安装完成"
-    log "系统依赖安装完成"
-}
 
-# 安装 Google Chrome
-install_chrome() {
-    print_step "安装 Google Chrome..."
-    
-    if command -v google-chrome >/dev/null 2>&1; then
-        print_info "Google Chrome 已安装"
+    # 输入密码（隐藏显示）
+    while true; do
+        read -s -p "请输入您的密码: " USER_PASSWORD
+        echo
+        if [[ -n "$USER_PASSWORD" ]]; then
+            read -s -p "请再次确认密码: " USER_PASSWORD_CONFIRM
+            echo
+            if [[ "$USER_PASSWORD" == "$USER_PASSWORD_CONFIRM" ]]; then
+                break
+            else
+                print_error "两次输入的密码不一致，请重新输入"
+            fi
+        else
+            print_error "密码不能为空"
+        fi
+    done
+
+    # 输入商品PID
+    while true; do
+        read -p "请输入要抢购的商品PID: " PRODUCT_PID
+        if [[ -n "$PRODUCT_PID" && "$PRODUCT_PID" =~ ^[0-9]+$ ]]; then
+            break
+        else
+            print_error "请输入有效的数字PID"
+        fi
+    done
+
+    # 确认信息
+    echo
+    print_info "请确认您的配置信息："
+    echo "邮箱: $USER_EMAIL"
+    echo "密码: $(echo "$USER_PASSWORD" | sed 's/./*/g')"
+    echo "商品PID: $PRODUCT_PID"
+    echo
+
+    read -p "确认信息正确？(y/n): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_warning "重新输入配置信息..."
+        collect_user_input
         return
     fi
-    
-    # 下载并安装 Chrome
-    cd /tmp
-    wget -q -O google-chrome-stable_current_amd64.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-    sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get install -f -y
-    
-    # 验证安装
-    if command -v google-chrome >/dev/null 2>&1; then
-        print_success "Google Chrome 安装成功"
-        google-chrome --version
-    else
-        print_error "Google Chrome 安装失败"
-        exit 1
-    fi
-    
-    log "Google Chrome 安装完成"
+
+    print_success "用户配置收集完成"
+    log "用户配置收集完成"
 }
 
-# 创建Python虚拟环境
-create_virtual_environment() {
-    print_step "创建Python虚拟环境..."
-    
-    if [[ -d "$VENV_DIR" ]]; then
-        print_warning "虚拟环境已存在，是否重新创建？"
-        read -p "(y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            rm -rf "$VENV_DIR"
-        else
-            print_info "使用现有虚拟环境"
-            return
-        fi
-    fi
-    
-    python3 -m venv "$VENV_DIR"
-    source "$VENV_DIR/bin/activate"
-    
-    # 升级pip
-    pip install --upgrade pip >/dev/null 2>&1
-    
-    print_success "Python虚拟环境创建完成"
-    log "Python虚拟环境创建完成"
-}
+# 生成配置文件
+generate_config_file() {
+    print_step "生成配置文件..."
 
-# 安装Python依赖
-install_python_dependencies() {
-    print_step "安装Python依赖包..."
-    
-    source "$VENV_DIR/bin/activate"
-    
-    # 创建requirements.txt如果不存在
-    if [[ ! -f "$PROJECT_DIR/requirements.txt" ]]; then
-        cat > "$PROJECT_DIR/requirements.txt" << EOF
-DrissionPage>=4.0.0
-python-dotenv>=1.0.0
-selenium>=4.0.0
-requests>=2.28.0
-EOF
-    fi
-    
-    # 安装依赖
-    pip install -r "$PROJECT_DIR/requirements.txt"
-    
-    print_success "Python依赖安装完成"
-    log "Python依赖安装完成"
-}
+    local env_file="$REPO_DIR/.env"
 
-# 配置环境文件
-setup_environment() {
-    print_step "配置环境文件..."
-    
-    if [[ ! -f "$PROJECT_DIR/.env" ]]; then
-        print_warning ".env 文件不存在，创建示例配置文件"
-        
-        cat > "$PROJECT_DIR/.env.example" << EOF
+    # 构建产品URL
+    local base_url="https://my.rfchost.com"
+    local login_url="$base_url/clientarea.php"
+    local product_url="$base_url/cart.php?a=add&pid=$PRODUCT_PID"
+
+    # 生成.env文件
+    cat > "$env_file" << EOF
 # 基础配置
-BASE_URL=https://my.rfchost.com
-LOGIN_URL=https://my.rfchost.com/clientarea.php
-PRODUCT_URL=https://my.rfchost.com/cart.php?a=add&pid=229
+BASE_URL=$base_url
+LOGIN_URL=$login_url
+PRODUCT_URL=$product_url
 
 # 登录信息
-EMAIL=your_email@example.com
-PASSWORD=your_password
+EMAIL=$USER_EMAIL
+PASSWORD=$USER_PASSWORD
 
-# 性能配置
+# 性能配置 - 优化设置
 HEADLESS_MODE=True
 DELAY_TIME=0.3
 ELEMENT_TIMEOUT=2
@@ -233,228 +281,211 @@ PROMO_CODE=
 TG_BOT_TOKEN=
 TG_CHAT_ID=
 EOF
-        
-        print_warning "请复制 .env.example 为 .env 并填写您的配置信息"
-        print_info "配置文件位置: $PROJECT_DIR/.env.example"
-    else
-        print_success "环境配置文件已存在"
-    fi
-    
-    log "环境配置完成"
+
+    print_success "配置文件生成完成: $env_file"
+    log "配置文件生成完成"
 }
 
-# 创建启动脚本
-create_startup_scripts() {
-    print_step "创建启动脚本..."
-    
-    # 创建主启动脚本
-    cat > "$PROJECT_DIR/start.sh" << 'EOF'
-#!/bin/bash
+# 安装系统依赖（根据操作系统）
+install_system_dependencies() {
+    print_step "安装系统依赖..."
 
-# WHCMS Auto Grabber 启动脚本
-
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_DIR="$PROJECT_DIR/venv"
-
-# 颜色定义
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-print_success() { echo -e "${GREEN}✅ $1${NC}"; }
-print_error() { echo -e "${RED}❌ $1${NC}"; }
-print_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
-
-# 检查虚拟环境
-if [[ ! -d "$VENV_DIR" ]]; then
-    print_error "虚拟环境不存在，请先运行部署脚本"
-    exit 1
-fi
-
-# 激活虚拟环境
-source "$VENV_DIR/bin/activate"
-
-# 检查配置文件
-if [[ ! -f "$PROJECT_DIR/.env" ]]; then
-    print_error "配置文件 .env 不存在"
-    print_warning "请复制 .env.example 为 .env 并填写配置信息"
-    exit 1
-fi
-
-# 启动应用
-print_success "启动 WHCMS Auto Grabber..."
-cd "$PROJECT_DIR"
-
-# 检查是否有显示服务器
-if [[ -z "$DISPLAY" ]]; then
-    print_warning "未检测到显示服务器，使用虚拟显示"
-    export DISPLAY=:99
-    Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-    XVFB_PID=$!
-    sleep 2
-fi
-
-# 运行快速启动脚本
-python quick_start.py
-
-# 清理
-if [[ -n "$XVFB_PID" ]]; then
-    kill $XVFB_PID 2>/dev/null || true
-fi
-EOF
-    
-    chmod +x "$PROJECT_DIR/start.sh"
-    
-    # 创建后台运行脚本
-    cat > "$PROJECT_DIR/start_daemon.sh" << 'EOF'
-#!/bin/bash
-
-# WHCMS Auto Grabber 后台运行脚本
-
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_DIR="$PROJECT_DIR/venv"
-PID_FILE="$PROJECT_DIR/grabber.pid"
-LOG_FILE="$PROJECT_DIR/grabber_daemon.log"
-
-# 颜色定义
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-print_success() { echo -e "${GREEN}✅ $1${NC}"; }
-print_error() { echo -e "${RED}❌ $1${NC}"; }
-print_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
-
-start_daemon() {
-    if [[ -f "$PID_FILE" ]] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
-        print_warning "服务已在运行中 (PID: $(cat "$PID_FILE"))"
-        return 1
+    if [[ "$OS" == "debian" ]]; then
+        install_debian_dependencies
+    elif [[ "$OS" == "redhat" ]]; then
+        install_redhat_dependencies
+    elif [[ "$OS" == "macos" ]]; then
+        install_macos_dependencies
+    elif [[ "$OS" == "windows" ]]; then
+        print_info "Windows环境，跳过系统依赖安装"
+    else
+        print_warning "未知系统，跳过系统依赖安装"
     fi
-    
-    print_success "启动后台服务..."
-    
+}
+
+# Debian/Ubuntu 依赖安装
+install_debian_dependencies() {
+    print_info "安装 Debian/Ubuntu 系统依赖..."
+
+    # 更新包列表
+    sudo apt-get update -qq
+
+    local packages=(
+        "python3-venv"
+        "python3-dev"
+        "wget"
+        "curl"
+        "unzip"
+    )
+
+    # 如果是桌面环境，安装浏览器相关依赖
+    if [[ -n "$DISPLAY" ]] || command -v Xvfb >/dev/null 2>&1; then
+        packages+=(
+            "xvfb"
+            "fonts-liberation"
+            "libasound2"
+            "libatk-bridge2.0-0"
+            "libdrm2"
+            "libxcomposite1"
+            "libxdamage1"
+            "libxrandr2"
+            "libgbm1"
+            "libxss1"
+            "libnss3"
+        )
+    fi
+
+    for package in "${packages[@]}"; do
+        if ! dpkg -l | grep -q "^ii  $package "; then
+            print_info "安装 $package..."
+            sudo apt-get install -y "$package" >/dev/null 2>&1
+        else
+            print_info "$package 已安装"
+        fi
+    done
+
+    print_success "Debian/Ubuntu 依赖安装完成"
+}
+
+# RedHat/CentOS 依赖安装
+install_redhat_dependencies() {
+    print_info "安装 RedHat/CentOS 系统依赖..."
+
+    local packages=(
+        "python3-devel"
+        "wget"
+        "curl"
+        "unzip"
+    )
+
+    for package in "${packages[@]}"; do
+        if ! rpm -q "$package" >/dev/null 2>&1; then
+            print_info "安装 $package..."
+            sudo yum install -y "$package" >/dev/null 2>&1
+        else
+            print_info "$package 已安装"
+        fi
+    done
+
+    print_success "RedHat/CentOS 依赖安装完成"
+}
+
+# macOS 依赖安装
+install_macos_dependencies() {
+    print_info "macOS 环境，检查 Homebrew..."
+
+    if ! command -v brew >/dev/null 2>&1; then
+        print_warning "未安装 Homebrew，建议安装以便管理依赖"
+        print_info "安装命令: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+    else
+        print_success "Homebrew 已安装"
+    fi
+}
+
+# 安装浏览器（可选）
+install_browser() {
+    print_step "检查浏览器安装..."
+
+    # 检查是否已安装Chrome或Chromium
+    if command -v google-chrome >/dev/null 2>&1; then
+        print_success "Google Chrome 已安装: $(google-chrome --version)"
+        return
+    elif command -v chromium-browser >/dev/null 2>&1; then
+        print_success "Chromium 已安装: $(chromium-browser --version)"
+        return
+    elif command -v chromium >/dev/null 2>&1; then
+        print_success "Chromium 已安装: $(chromium --version)"
+        return
+    fi
+
+    # 根据系统安装浏览器
+    if [[ "$OS" == "debian" ]]; then
+        print_info "尝试安装 Chromium 浏览器..."
+        if sudo apt-get install -y chromium-browser >/dev/null 2>&1; then
+            print_success "Chromium 安装成功"
+        else
+            print_warning "Chromium 安装失败，脚本将使用无头模式"
+        fi
+    elif [[ "$OS" == "redhat" ]]; then
+        print_info "尝试安装 Chromium 浏览器..."
+        if sudo yum install -y chromium >/dev/null 2>&1; then
+            print_success "Chromium 安装成功"
+        else
+            print_warning "Chromium 安装失败，脚本将使用无头模式"
+        fi
+    elif [[ "$OS" == "macos" ]]; then
+        if command -v brew >/dev/null 2>&1; then
+            print_info "尝试安装 Chromium 浏览器..."
+            if brew install --cask chromium >/dev/null 2>&1; then
+                print_success "Chromium 安装成功"
+            else
+                print_warning "Chromium 安装失败，请手动安装 Chrome 或 Chromium"
+            fi
+        else
+            print_warning "请手动安装 Chrome 或 Chromium 浏览器"
+        fi
+    else
+        print_warning "请确保系统已安装 Chrome 或 Chromium 浏览器"
+    fi
+
+    log "浏览器检查完成"
+}
+
+# 创建Python虚拟环境
+create_virtual_environment() {
+    print_step "创建Python虚拟环境..."
+
+    cd "$REPO_DIR"
+
+    if [[ -d "$VENV_DIR" ]]; then
+        print_warning "虚拟环境已存在，是否重新创建？"
+        read -p "(y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            rm -rf "$VENV_DIR"
+        else
+            print_info "使用现有虚拟环境"
+            return
+        fi
+    fi
+
+    # 创建虚拟环境
+    python3 -m venv "$VENV_DIR"
+
     # 激活虚拟环境
-    source "$VENV_DIR/bin/activate"
-    
-    # 设置虚拟显示
-    export DISPLAY=:99
-    Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-    XVFB_PID=$!
-    sleep 2
-    
-    # 启动应用
-    cd "$PROJECT_DIR"
-    nohup python simple_fast_grabber.py > "$LOG_FILE" 2>&1 &
-    echo $! > "$PID_FILE"
-    
-    print_success "服务已启动 (PID: $(cat "$PID_FILE"))"
-    print_success "日志文件: $LOG_FILE"
-}
-
-stop_daemon() {
-    if [[ ! -f "$PID_FILE" ]]; then
-        print_warning "服务未运行"
-        return 1
-    fi
-    
-    PID=$(cat "$PID_FILE")
-    if kill -0 "$PID" 2>/dev/null; then
-        print_success "停止服务 (PID: $PID)..."
-        kill "$PID"
-        rm -f "$PID_FILE"
-        
-        # 停止虚拟显示
-        pkill -f "Xvfb :99" 2>/dev/null || true
-        
-        print_success "服务已停止"
+    if [[ "$OS" == "windows" ]]; then
+        source "$VENV_DIR/Scripts/activate"
     else
-        print_warning "服务进程不存在"
-        rm -f "$PID_FILE"
+        source "$VENV_DIR/bin/activate"
     fi
+
+    # 升级pip
+    pip install --upgrade pip >/dev/null 2>&1
+
+    print_success "Python虚拟环境创建完成"
+    log "Python虚拟环境创建完成"
 }
 
-status_daemon() {
-    if [[ -f "$PID_FILE" ]] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
-        print_success "服务正在运行 (PID: $(cat "$PID_FILE"))"
-        return 0
+# 安装Python依赖
+install_python_dependencies() {
+    print_step "安装Python依赖包..."
+
+    cd "$REPO_DIR"
+
+    # 激活虚拟环境
+    if [[ "$OS" == "windows" ]]; then
+        source "$VENV_DIR/Scripts/activate"
     else
-        print_warning "服务未运行"
-        return 1
+        source "$VENV_DIR/bin/activate"
     fi
-}
 
-case "$1" in
-    start)
-        start_daemon
-        ;;
-    stop)
-        stop_daemon
-        ;;
-    restart)
-        stop_daemon
-        sleep 2
-        start_daemon
-        ;;
-    status)
-        status_daemon
-        ;;
-    *)
-        echo "用法: $0 {start|stop|restart|status}"
-        exit 1
-        ;;
-esac
-EOF
-    
-    chmod +x "$PROJECT_DIR/start_daemon.sh"
-    
-    print_success "启动脚本创建完成"
-    log "启动脚本创建完成"
-}
-
-# 创建systemd服务文件
-create_systemd_service() {
-    print_step "创建systemd服务文件..."
-
-    local service_file="/etc/systemd/system/whcms-grabber.service"
-    local current_user=$(whoami)
-
-    sudo tee "$service_file" > /dev/null << EOF
-[Unit]
-Description=WHCMS Auto Grabber Service
-After=network.target
-
-[Service]
-Type=forking
-User=$current_user
-WorkingDirectory=$PROJECT_DIR
-Environment=DISPLAY=:99
-ExecStartPre=/usr/bin/Xvfb :99 -screen 0 1024x768x24
-ExecStart=$PROJECT_DIR/start_daemon.sh start
-ExecStop=$PROJECT_DIR/start_daemon.sh stop
-ExecReload=$PROJECT_DIR/start_daemon.sh restart
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    sudo systemctl daemon-reload
-    print_success "systemd服务文件创建完成"
-    print_info "服务名称: whcms-grabber"
-    print_info "启动服务: sudo systemctl start whcms-grabber"
-    print_info "开机自启: sudo systemctl enable whcms-grabber"
-
-    log "systemd服务创建完成"
-}
-
-# 创建requirements.txt文件
-create_requirements() {
-    print_step "创建Python依赖文件..."
-
-    cat > "$PROJECT_DIR/requirements.txt" << EOF
+    # 检查是否有requirements.txt
+    if [[ -f "requirements.txt" ]]; then
+        print_info "使用项目的 requirements.txt"
+        pip install -r requirements.txt
+    else
+        print_info "创建基础 requirements.txt"
+        cat > "requirements.txt" << EOF
 # 核心依赖
 DrissionPage>=4.0.0
 python-dotenv>=1.0.0
@@ -473,17 +504,25 @@ colorlog>=6.7.0
 # 可选依赖 (Telegram通知)
 python-telegram-bot>=20.0
 EOF
+        pip install -r requirements.txt
+    fi
 
-    print_success "requirements.txt 创建完成"
-    log "requirements.txt 创建完成"
+    print_success "Python依赖安装完成"
+    log "Python依赖安装完成"
 }
 
 # 运行测试
 run_tests() {
     print_step "运行系统测试..."
 
-    source "$VENV_DIR/bin/activate"
-    cd "$PROJECT_DIR"
+    cd "$REPO_DIR"
+
+    # 激活虚拟环境
+    if [[ "$OS" == "windows" ]]; then
+        source "$VENV_DIR/Scripts/activate"
+    else
+        source "$VENV_DIR/bin/activate"
+    fi
 
     # 测试Python环境
     print_info "测试Python环境..."
@@ -511,64 +550,224 @@ except ImportError as e:
     print(f'❌ selenium 导入失败: {e}')
 "
 
-    # 测试Chrome
-    print_info "测试Chrome浏览器..."
-    if command -v google-chrome >/dev/null 2>&1; then
-        google-chrome --version
-        print_success "Chrome测试通过"
+    # 测试配置文件
+    if [[ -f ".env" ]]; then
+        print_success "配置文件存在"
+        python3 -c "
+from dotenv import load_dotenv
+import os
+load_dotenv()
+required_configs = ['PRODUCT_URL', 'LOGIN_URL', 'EMAIL', 'PASSWORD']
+missing_configs = [config for config in required_configs if not os.getenv(config)]
+if missing_configs:
+    print(f'❌ 缺少必要配置: {missing_configs}')
+else:
+    print('✅ 配置文件验证通过')
+"
     else
-        print_error "Chrome测试失败"
-    fi
-
-    # 测试虚拟显示
-    print_info "测试虚拟显示..."
-    export DISPLAY=:99
-    Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-    XVFB_PID=$!
-    sleep 2
-
-    if ps -p $XVFB_PID > /dev/null; then
-        print_success "虚拟显示测试通过"
-        kill $XVFB_PID
-    else
-        print_error "虚拟显示测试失败"
+        print_error "配置文件不存在"
     fi
 
     print_success "系统测试完成"
     log "系统测试完成"
 }
 
-# 显示部署完成信息
+# 启动应用程序
+start_application() {
+    print_step "启动抢购应用程序..."
+
+    cd "$REPO_DIR"
+
+    # 激活虚拟环境
+    if [[ "$OS" == "windows" ]]; then
+        source "$VENV_DIR/Scripts/activate"
+    else
+        source "$VENV_DIR/bin/activate"
+    fi
+
+    # 检查配置文件
+    if [[ ! -f ".env" ]]; then
+        print_error "配置文件不存在，无法启动应用"
+        exit 1
+    fi
+
+    print_success "配置完成，准备启动抢购程序..."
+    echo
+    print_info "启动选项："
+    echo "1. 快速启动（推荐）- 使用 quick_start.py"
+    echo "2. 简化快速模式 - 使用 simple_fast_grabber.py"
+    echo "3. 原版模式 - 使用 auto.py"
+    echo "4. 退出"
+    echo
+
+    read -p "请选择启动方式 (1-4): " -n 1 -r
+    echo
+
+    case $REPLY in
+        1)
+            print_info "启动快速启动程序..."
+            if [[ -f "quick_start.py" ]]; then
+                python quick_start.py
+            else
+                print_error "quick_start.py 不存在，使用备用方案"
+                python auto.py
+            fi
+            ;;
+        2)
+            print_info "启动简化快速模式..."
+            if [[ -f "simple_fast_grabber.py" ]]; then
+                python simple_fast_grabber.py
+            else
+                print_error "simple_fast_grabber.py 不存在，使用备用方案"
+                python auto.py
+            fi
+            ;;
+        3)
+            print_info "启动原版模式..."
+            python auto.py
+            ;;
+        4)
+            print_info "退出程序"
+            return
+            ;;
+        *)
+            print_warning "无效选择，使用默认启动方式"
+            python auto.py
+            ;;
+    esac
+
+    print_success "应用程序执行完成"
+    log "应用程序启动完成"
+}
+
+# 创建启动脚本
+create_startup_scripts() {
+    print_step "创建启动脚本..."
+
+    # 创建主启动脚本
+    local start_script="$PROJECT_DIR/start_grabber.sh"
+
+    cat > "$start_script" << EOF
+#!/bin/bash
+
+# RFC Auto Grabber 启动脚本
+
+SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="\$SCRIPT_DIR/rfc_repo"
+VENV_DIR="\$SCRIPT_DIR/venv"
+
+# 颜色定义
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+print_success() { echo -e "\${GREEN}✅ \$1\${NC}"; }
+print_error() { echo -e "\${RED}❌ \$1\${NC}"; }
+print_warning() { echo -e "\${YELLOW}⚠️  \$1\${NC}"; }
+
+# 检查目录
+if [[ ! -d "\$REPO_DIR" ]]; then
+    print_error "代码目录不存在，请先运行部署脚本"
+    exit 1
+fi
+
+if [[ ! -d "\$VENV_DIR" ]]; then
+    print_error "虚拟环境不存在，请先运行部署脚本"
+    exit 1
+fi
+
+cd "\$REPO_DIR"
+
+# 激活虚拟环境
+if [[ "\$OSTYPE" == "msys" ]] || [[ "\$OSTYPE" == "cygwin" ]]; then
+    source "\$VENV_DIR/Scripts/activate"
+else
+    source "\$VENV_DIR/bin/activate"
+fi
+
+# 检查配置文件
+if [[ ! -f ".env" ]]; then
+    print_error "配置文件 .env 不存在"
+    print_warning "请先运行部署脚本进行配置"
+    exit 1
+fi
+
+# 启动应用
+print_success "启动 RFC Auto Grabber..."
+
+# 检查是否有显示服务器（Linux环境）
+if [[ "\$OSTYPE" == "linux-gnu"* ]] && [[ -z "\$DISPLAY" ]]; then
+    print_warning "未检测到显示服务器，使用虚拟显示"
+    export DISPLAY=:99
+    Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+    XVFB_PID=\$!
+    sleep 2
+fi
+
+# 检查Python命令
+if command -v python >/dev/null 2>&1; then
+    PYTHON_CMD="python"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_CMD="python3"
+else
+    print_error "未找到Python命令"
+    exit 1
+fi
+
+# 运行快速启动脚本
+if [[ -f "quick_start.py" ]]; then
+    \$PYTHON_CMD quick_start.py
+else
+    \$PYTHON_CMD auto.py
+fi
+
+# 清理
+if [[ -n "\$XVFB_PID" ]]; then
+    kill \$XVFB_PID 2>/dev/null || true
+fi
+EOF
+
+    chmod +x "$start_script"
+
+    print_success "启动脚本创建完成: $start_script"
+    log "启动脚本创建完成"
+}
+
+# 显示完成信息
 show_completion_info() {
     print_success "🎉 部署完成！"
     echo
-    print_info "项目目录: $PROJECT_DIR"
-    print_info "虚拟环境: $VENV_DIR"
-    print_info "日志文件: $LOG_FILE"
+    print_info "项目信息："
+    print_info "  - 代码目录: $REPO_DIR"
+    print_info "  - 虚拟环境: $VENV_DIR"
+    print_info "  - 配置文件: $REPO_DIR/.env"
+    print_info "  - 启动脚本: $PROJECT_DIR/start_grabber.sh"
+    print_info "  - 日志文件: $LOG_FILE"
     echo
     print_step "使用方法："
-    echo "  1. 配置环境变量:"
-    echo "     cp .env.example .env"
-    echo "     nano .env  # 编辑配置文件"
+    echo "  1. 直接启动（推荐）:"
+    echo "     cd $REPO_DIR"
+    echo "     source $VENV_DIR/bin/activate  # Windows: source $VENV_DIR/Scripts/activate"
+    echo "     python quick_start.py"
     echo
-    echo "  2. 交互式启动:"
-    echo "     ./start.sh"
+    echo "  2. 使用启动脚本:"
+    echo "     $PROJECT_DIR/start_grabber.sh"
     echo
-    echo "  3. 后台运行:"
-    echo "     ./start_daemon.sh start    # 启动"
-    echo "     ./start_daemon.sh stop     # 停止"
-    echo "     ./start_daemon.sh status   # 状态"
-    echo "     ./start_daemon.sh restart  # 重启"
+    echo "  3. 手动启动特定模式:"
+    echo "     cd $REPO_DIR && source $VENV_DIR/bin/activate"
+    echo "     python simple_fast_grabber.py  # 简化快速模式"
+    echo "     python auto.py                 # 原版模式"
     echo
-    echo "  4. 系统服务 (可选):"
-    echo "     sudo systemctl start whcms-grabber    # 启动服务"
-    echo "     sudo systemctl enable whcms-grabber   # 开机自启"
-    echo "     sudo systemctl status whcms-grabber   # 查看状态"
+    print_info "配置信息："
+    echo "  - 邮箱: $USER_EMAIL"
+    echo "  - 商品PID: $PRODUCT_PID"
+    echo "  - 产品URL: https://my.rfchost.com/cart.php?a=add&pid=$PRODUCT_PID"
     echo
     print_warning "⚠️  重要提醒："
-    echo "  - 请先配置 .env 文件中的登录信息"
-    echo "  - 建议先使用交互式启动测试配置"
-    echo "  - 生产环境建议使用后台运行模式"
+    echo "  - 配置已自动生成，如需修改请编辑 $REPO_DIR/.env"
+    echo "  - 建议先测试运行确保配置正确"
+    echo "  - 抢购时请确保网络稳定"
     echo
     print_success "祝您抢单成功！🚀"
 }
@@ -578,8 +777,8 @@ main() {
     clear
     echo -e "${CYAN}"
     echo "=============================================="
-    echo "    WHCMS Auto Grabber - 一键部署脚本"
-    echo "    支持 Debian/Ubuntu 系统"
+    echo "    RFC Auto Grabber - 智能部署脚本"
+    echo "    支持从GitHub自动拉取并配置启动"
     echo "=============================================="
     echo -e "${NC}"
 
@@ -589,17 +788,27 @@ main() {
     # 执行部署步骤
     check_root
     check_system
-    update_system
+    clone_or_update_repo
+    collect_user_input
+    generate_config_file
     install_system_dependencies
-    install_chrome
+    install_browser
     create_virtual_environment
-    create_requirements
     install_python_dependencies
-    setup_environment
-    create_startup_scripts
-    create_systemd_service
     run_tests
+    create_startup_scripts
     show_completion_info
+
+    echo
+    print_step "是否立即启动抢购程序？"
+    read -p "(y/n): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        start_application
+    else
+        print_info "您可以稍后使用以下命令启动："
+        print_info "$PROJECT_DIR/start_grabber.sh"
+    fi
 
     log "部署完成: $(date)"
 }
