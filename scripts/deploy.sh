@@ -283,6 +283,20 @@ generate_config_file() {
     local login_url="$base_url/clientarea.php"
     local product_url="$base_url/cart.php?a=add&pid=$PRODUCT_PID"
 
+    # 检测是否为Linux服务器环境（无显示服务器）
+    local headless_mode="True"
+    if [[ "$OSTYPE" == "linux-gnu"* ]] && [[ -z "$DISPLAY" ]]; then
+        headless_mode="True"
+        print_info "检测到Linux服务器环境，自动启用无头模式"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]] && [[ -n "$DISPLAY" ]]; then
+        print_info "检测到Linux桌面环境，可选择是否使用无头模式"
+        read -p "是否使用无头模式？(推荐) (Y/n): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            headless_mode="False"
+        fi
+    fi
+
     # 生成.env文件
     cat > "$env_file" << EOF
 # 基础配置
@@ -295,7 +309,7 @@ EMAIL=$USER_EMAIL
 PASSWORD=$USER_PASSWORD
 
 # 性能配置 - 优化设置
-HEADLESS_MODE=True
+HEADLESS_MODE=$headless_mode
 DELAY_TIME=0.3
 ELEMENT_TIMEOUT=2
 PAGE_LOAD_TIMEOUT=10
@@ -311,7 +325,8 @@ TG_CHAT_ID=
 EOF
 
     print_success "配置文件生成完成: $env_file"
-    log "配置文件生成完成"
+    print_info "无头模式设置: $headless_mode"
+    log "配置文件生成完成，无头模式: $headless_mode"
 }
 
 # 安装系统依赖（根据操作系统）

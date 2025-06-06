@@ -15,6 +15,7 @@ from DrissionPage import Chromium, ChromiumOptions
 import queue
 import random
 from contextlib import contextmanager
+from ..utils.linux_optimizer import apply_linux_optimizations
 
 class BrowserInstance:
     """浏览器实例"""
@@ -35,11 +36,11 @@ class BrowserInstance:
         """创建浏览器实例"""
         try:
             co = ChromiumOptions().auto_port()
-            
+
             if self.config.get('HEADLESS_MODE', True):
                 co.headless()
-            
-            # 极致性能优化
+
+            # 基础性能优化
             performance_args = [
                 '--disable-blink-features=AutomationControlled',
                 '--disable-dev-shm-usage',
@@ -58,9 +59,12 @@ class BrowserInstance:
                 '--max_old_space_size=2048',
                 f'--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             ]
-            
+
             for arg in performance_args:
                 co.set_argument(arg)
+
+            # 应用Linux环境优化
+            co = apply_linux_optimizations(co, 'performance')
             
             # 设置加载模式
             co.set_load_mode('none')

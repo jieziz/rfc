@@ -18,6 +18,7 @@ import random
 import queue
 from typing import Dict, Any, List
 from ..utils.TimePinner import Pinner
+from ..utils.linux_optimizer import apply_linux_optimizations
 
 # 配置日志
 logging.basicConfig(
@@ -76,11 +77,27 @@ class BrowserWorker:
             
             # 高性能配置
             co.set_load_mode('none')
-            co.set_argument('--disable-blink-features=AutomationControlled')
-            co.set_argument('--disable-dev-shm-usage')
-            co.set_argument('--no-sandbox')
-            co.set_argument('--disable-gpu')
-            co.set_argument('--disable-images')
+
+            # 基础性能参数
+            performance_args = [
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
+                '--no-sandbox',
+                '--disable-gpu',
+                '--disable-images',
+                '--disable-extensions',
+                '--disable-plugins',
+                '--disable-web-security',
+                '--disable-features=TranslateUI',
+                '--memory-pressure-off'
+            ]
+
+            # 应用基础参数
+            for arg in performance_args:
+                co.set_argument(arg)
+
+            # 应用Linux环境优化
+            co = apply_linux_optimizations(co, 'performance')
             
             self.browser = Chromium(co)
             self.page = self.browser.latest_tab

@@ -9,6 +9,7 @@ import time
 import subprocess
 try:
     from src.core.performance_config import PerformanceConfig, create_optimized_env_file
+    from src.utils.linux_optimizer import log_environment_info, is_linux_headless_environment
 except ImportError as e:
     print(f"导入错误: {e}")
     print("请确保所有文件都在正确的目录中")
@@ -163,7 +164,15 @@ def show_performance_tips():
 def main():
     """主函数"""
     print_banner()
-    
+
+    # 检测并记录环境信息
+    print("🔍 检测系统环境...")
+    log_environment_info()
+
+    # Linux无头环境提示
+    if is_linux_headless_environment():
+        print("🐧 检测到Linux服务器环境（无显示），已自动启用无头模式优化")
+
     # 检查配置
     if not check_config():
         print("\n请先配置 .env 文件后再运行。")

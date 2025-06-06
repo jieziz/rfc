@@ -10,6 +10,7 @@ from DrissionPage import Chromium, ChromiumOptions
 from dotenv import load_dotenv
 import os
 from ..utils.TimePinner import Pinner
+from ..utils.linux_optimizer import apply_linux_optimizations
 from typing import Dict, Any
 import random
 
@@ -76,9 +77,12 @@ def create_fast_browser(config: Dict[str, Any]):
         '--memory-pressure-off',
         '--max_old_space_size=2048'
     ]
-    
+
     for arg in performance_args:
         co.set_argument(arg)
+
+    # 应用Linux环境优化
+    co = apply_linux_optimizations(co, 'performance')
     
     browser = Chromium(co)
     page = browser.latest_tab
