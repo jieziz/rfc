@@ -32,9 +32,7 @@ def apply_headless_config(co, config: Dict[str, Any]):
         co.headless()
 
         # 添加无头模式必要参数
-        co.set_argument('--disable-dev-shm-usage')
-        co.set_argument('--disable-gpu')
-        co.set_argument('--window-size=1920,1080')
+        co.set_argument('--no-sandbox')
 
         logging.info("已启用无头模式")
     else:

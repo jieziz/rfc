@@ -32,9 +32,6 @@ def apply_headless_config(co, config: Dict[str, Any]):
 
         # 添加无头模式必要参数
         co.set_argument('--no-sandbox')
-        co.set_argument('--disable-dev-shm-usage')
-        co.set_argument('--disable-gpu')
-        co.set_argument('--window-size=1920,1080')
 
         logging.info("已启用无头模式")
     else:
@@ -127,7 +124,6 @@ def create_stable_browser(config: Dict[str, Any]):
 
     # 应用无头模式配置
     co = apply_headless_config(co, config)
-
     # 设置浏览器首选项
     co.set_pref('credentials_enable_service', False)
 
