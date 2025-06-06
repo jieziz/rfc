@@ -104,23 +104,29 @@ def run_script(script_name: str, mode: str = None):
     """运行脚本"""
     try:
         print(f"🚀 启动脚本: {script_name}")
-        
-        if mode:
-            cmd = [sys.executable, script_name, mode]
+
+        # 将文件路径转换为模块路径
+        if script_name.endswith('.py'):
+            module_name = script_name[:-3].replace('/', '.').replace('\\', '.')
         else:
-            cmd = [sys.executable, script_name]
-        
+            module_name = script_name.replace('/', '.').replace('\\', '.')
+
+        if mode:
+            cmd = [sys.executable, '-m', module_name, mode]
+        else:
+            cmd = [sys.executable, '-m', module_name]
+
         print(f"执行命令: {' '.join(cmd)}")
         print("=" * 60)
-        
+
         # 运行脚本
         process = subprocess.run(cmd, cwd=os.getcwd())
-        
+
         if process.returncode == 0:
             print("✅ 脚本执行完成")
         else:
             print(f"❌ 脚本执行失败，退出码: {process.returncode}")
-            
+
     except KeyboardInterrupt:
         print("\n⏹️ 用户中断执行")
     except Exception as e:

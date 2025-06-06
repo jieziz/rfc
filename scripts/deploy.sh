@@ -232,18 +232,11 @@ collect_user_input() {
         fi
     done
 
-    # 输入密码（隐藏显示）
+    # 输入密码（显示输入）
     while true; do
-        read -s -p "请输入您的密码: " USER_PASSWORD
-        echo
+        read -p "请输入您的密码: " USER_PASSWORD
         if [[ -n "$USER_PASSWORD" ]]; then
-            read -s -p "请再次确认密码: " USER_PASSWORD_CONFIRM
-            echo
-            if [[ "$USER_PASSWORD" == "$USER_PASSWORD_CONFIRM" ]]; then
-                break
-            else
-                print_error "两次输入的密码不一致，请重新输入"
-            fi
+            break
         else
             print_error "密码不能为空"
         fi
@@ -651,7 +644,7 @@ start_application() {
         2)
             print_info "启动快速模式..."
             if [[ -f "src/grabbers/simple_fast_grabber.py" ]]; then
-                python src/grabbers/simple_fast_grabber.py
+                python -m src.grabbers.simple_fast_grabber
             else
                 print_error "simple_fast_grabber.py 不存在"
                 return 1
@@ -660,7 +653,7 @@ start_application() {
         3)
             print_info "启动稳定模式..."
             if [[ -f "src/grabbers/stable_grabber.py" ]]; then
-                python src/grabbers/stable_grabber.py
+                python -m src.grabbers.stable_grabber
             else
                 print_error "stable_grabber.py 不存在"
                 return 1
@@ -797,8 +790,8 @@ show_completion_info() {
     echo
     echo "  3. 手动启动特定模式:"
     echo "     cd $REPO_DIR && source $VENV_DIR/bin/activate"
-    echo "     python src/grabbers/simple_fast_grabber.py  # 快速模式"
-    echo "     python src/grabbers/stable_grabber.py       # 稳定模式"
+    echo "     python -m src.grabbers.simple_fast_grabber  # 快速模式"
+    echo "     python -m src.grabbers.stable_grabber       # 稳定模式"
     echo
     print_info "配置信息："
     echo "  - 邮箱: $USER_EMAIL"
