@@ -20,6 +20,7 @@ from typing import Dict, Any, List
 from ..utils.TimePinner import Pinner
 from ..utils.linux_optimizer import apply_linux_optimizations
 
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -52,6 +53,8 @@ class ConcurrentConfig:
             'WORKER_DELAY': float(os.getenv("WORKER_DELAY", "0.1")),
             'CHECK_INTERVAL': float(os.getenv("CHECK_INTERVAL", "0.3")),
             'RESTART_INTERVAL': int(os.getenv("RESTART_INTERVAL", "300")),  # 5分钟重启
+            'PAYMENT_WAIT_TIME': int(os.getenv("PAYMENT_WAIT_TIME", "30")),  # 购买成功后等待用户付款的时间
+
         }
 
 class BrowserWorker:
@@ -89,7 +92,9 @@ class BrowserWorker:
                 '--disable-plugins',
                 '--disable-web-security',
                 '--disable-features=TranslateUI',
-                '--memory-pressure-off'
+                '--memory-pressure-off',
+                '--hide-crash-restore-bubble',
+                '--start-maximized'
             ]
 
             # 应用基础参数
@@ -98,7 +103,10 @@ class BrowserWorker:
 
             # 应用Linux环境优化
             co = apply_linux_optimizations(co, 'performance')
-            
+
+            # 设置浏览器首选项
+            co.set_pref('credentials_enable_service', False)
+
             # 使用ChromiumPage而不是Chromium（DrissionPage官方推荐）
             self.page = ChromiumPage(co)
             self.browser = self.page  # 保持兼容性
@@ -148,83 +156,220 @@ class BrowserWorker:
         """检查库存并购买"""
         try:
             self.check_count += 1
-            
+
             # 访问产品页面
             self.page.get(self.config['PRODUCT_URL'])
             time.sleep(0.2)
-            
+
             # 快速检查缺货
             out_of_stock_indicators = [
                 'text:Out of Stock',
                 'text:缺货',
                 '.out-of-stock'
             ]
-            
+
             for indicator in out_of_stock_indicators:
                 if self.page.s_ele(indicator, timeout=0.1):
                     return False
-            
+
             # 检查购买按钮
             buy_button = self.page.s_ele('#btnCompleteProductConfig', timeout=0.5)
             if not buy_button:
                 buy_button = self.page.s_ele('text:Add to Cart', timeout=0.5)
-            
+
             if buy_button:
                 # 有库存，尝试购买
                 logging.info(f"Worker-{self.worker_id}: 检测到库存，开始抢购！")
-                
-                # 点击购买
-                buy_button.click()
-                time.sleep(0.5)
-                
-                # 处理条款
-                tos_checkbox = self.page.s_ele('#tos-checkbox', timeout=0.5)
-                if tos_checkbox:
-                    tos_checkbox.click()
-                
-                # 结算
-                checkout_btn = self.page.s_ele('#checkout', timeout=1)
-                if not checkout_btn:
-                    checkout_btn = self.page.s_ele('text:Checkout', timeout=1)
-                
-                if checkout_btn:
-                    checkout_btn.click()
+
+                # 执行完整的购买流程
+                if self._perform_safe_purchase():
                     self.success_count += 1
-                    
+
                     # 通知主线程
                     self.result_queue.put({
                         'worker_id': self.worker_id,
                         'action': 'success',
                         'timestamp': time.time()
                     })
-                    
+
                     logging.info(f"🎉 Worker-{self.worker_id}: 抢单成功！")
+
+                    # 购买成功后，给用户足够时间完成付款
+                    wait_time = self.config['PAYMENT_WAIT_TIME']
+                    logging.info(f"Worker-{self.worker_id}: 购买成功，等待{wait_time}秒让用户完成付款...")
+                    time.sleep(wait_time)  # 给用户配置的时间完成付款
+
                     return True
-            
+
             return False
-            
+
         except Exception as e:
             logging.error(f"Worker-{self.worker_id}: 抢购过程错误: {e}")
+            return False
+
+    def _perform_safe_purchase(self) -> bool:
+        """安全的购买流程，避免在结算过程中被中断"""
+        try:
+            # 步骤1: 点击购买按钮
+            buy_selectors = [
+                '#btnCompleteProductConfig',
+                '.btn-add-cart',
+                'text:Add to Cart',
+                'text:立即购买'
+            ]
+
+            clicked = False
+            for selector in buy_selectors:
+                try:
+                    if self.page.s_ele(selector, timeout=0.3):
+                        self.page(selector).click()
+                        logging.info(f"Worker-{self.worker_id}: 点击购买按钮: {selector}")
+                        clicked = True
+                        break
+                except:
+                    continue
+
+            if not clicked:
+                logging.warning(f"Worker-{self.worker_id}: 未找到购买按钮")
+                return False
+
+            # 步骤2: 等待页面响应和系统验证
+            logging.info(f"Worker-{self.worker_id}: 等待5秒进行系统验证（反机器人验证、库存检查等）...")
+            time.sleep(5)  # 等待5秒确保系统验证通过（反机器人验证、库存检查等）
+            logging.info(f"Worker-{self.worker_id}: 系统验证等待完成")
+
+            # 步骤3: 处理条款（如果存在）
+            tos_selectors = [
+                '#tos-checkbox',
+                '.tos-checkbox',
+                'input[name="tos"]',
+                'text:I agree'
+            ]
+
+            for selector in tos_selectors:
+                try:
+                    if self.page.s_ele(selector, timeout=0.5):
+                        self.page(selector).click()
+                        logging.info(f"Worker-{self.worker_id}: 点击条款: {selector}")
+                        break
+                except:
+                    continue
+
+            # 步骤4: 点击结算并等待进入付款页面
+            checkout_selectors = [
+                '#checkout',
+                '.checkout-btn',
+                'text:Checkout',
+                'text:结算',
+                'text:立即支付'
+            ]
+
+            for selector in checkout_selectors:
+                try:
+                    if self.page.s_ele(selector, timeout=1):
+                        self.page(selector).click()
+                        logging.info(f"Worker-{self.worker_id}: 点击结算: {selector}")
+
+                        # 等待进入付款页面
+                        if self._wait_for_payment_page():
+                            logging.info(f"Worker-{self.worker_id}: 成功进入付款页面，请在浏览器中完成付款...")
+
+                            # 不立即返回，让用户有时间看到付款页面
+                            # 这里不做额外等待，让主循环处理等待逻辑
+                            return True
+                        else:
+                            logging.warning(f"Worker-{self.worker_id}: 未能进入付款页面")
+                            return False
+                except:
+                    continue
+
+            logging.warning(f"Worker-{self.worker_id}: 未找到结算按钮")
+            return False
+
+        except Exception as e:
+            logging.error(f"Worker-{self.worker_id}: 安全购买流程错误: {e}")
+            return False
+
+    def _wait_for_payment_page(self, max_wait_time: int = 15) -> bool:
+        """等待进入付款页面 - 缩短等待时间，避免阻塞太久"""
+        try:
+            # 付款页面的标识符
+            payment_indicators = [
+                'text:Payment',
+                'text:支付',
+                'text:付款',
+                '.payment-form',
+                '#payment-form',
+                'text:Credit Card',
+                'text:信用卡',
+                'text:PayPal',
+                'text:Order Summary',
+                'text:订单摘要',
+                'text:Total',
+                'text:总计',
+                'text:Billing',
+                'text:账单',
+                'text:Continue to Payment',
+                'text:继续付款'
+            ]
+
+            start_time = time.time()
+            logging.info(f"Worker-{self.worker_id}: 开始等待付款页面...")
+
+            while time.time() - start_time < max_wait_time:
+                # 检查是否已进入付款页面
+                for indicator in payment_indicators:
+                    if self.page.s_ele(indicator, timeout=0.3):
+                        logging.info(f"Worker-{self.worker_id}: 检测到付款页面标识: {indicator}")
+                        return True
+
+                # 检查URL是否包含付款相关关键词
+                try:
+                    current_url = self.page.url.lower()
+                    payment_url_keywords = ['payment', 'checkout', 'order', 'cart', 'billing', 'pay']
+
+                    for keyword in payment_url_keywords:
+                        if keyword in current_url:
+                            logging.info(f"Worker-{self.worker_id}: URL包含付款关键词: {keyword} - {current_url}")
+                            return True
+                except:
+                    pass
+
+                # 短暂等待后继续检查
+                time.sleep(0.5)
+
+            logging.warning(f"Worker-{self.worker_id}: 等待付款页面超时 ({max_wait_time}秒)")
+            return False
+
+        except Exception as e:
+            logging.error(f"Worker-{self.worker_id}: 等待付款页面错误: {e}")
             return False
     
     def run(self):
         """运行工作器"""
         self.is_running = True
-        
+
         if not self.setup_browser():
             self.is_running = False
             return
-        
+
         logging.info(f"Worker-{self.worker_id}: 开始监控...")
-        
+
         while self.is_running:
             try:
-                self.check_stock_and_purchase()
-                
+                # 检查库存并购买
+                purchase_success = self.check_stock_and_purchase()
+
+                # 如果购买成功且配置为单次购买，则停止
+                if purchase_success and self.config.get('STOP_AFTER_SUCCESS', True):
+                    logging.info(f"Worker-{self.worker_id}: 购买成功，根据配置停止运行")
+                    self.is_running = False
+                    break
+
                 # 动态延迟
                 delay = self.config['CHECK_INTERVAL'] + random.uniform(-0.1, 0.1)
                 time.sleep(max(0.1, delay))
-                
+
                 # 每100次检查报告状态
                 if self.check_count % 100 == 0:
                     self.result_queue.put({
@@ -233,7 +378,7 @@ class BrowserWorker:
                         'check_count': self.check_count,
                         'success_count': self.success_count
                     })
-                
+
             except Exception as e:
                 logging.error(f"Worker-{self.worker_id}: 运行错误: {e}")
                 time.sleep(1)

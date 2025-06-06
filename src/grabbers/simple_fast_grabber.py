@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 import os
 from ..utils.TimePinner import Pinner
 from ..utils.linux_optimizer import apply_linux_optimizations
+
 from typing import Dict, Any
 import random
 
@@ -42,6 +43,7 @@ def load_fast_config() -> Dict[str, Any]:
         'ELEMENT_TIMEOUT': float(os.getenv("ELEMENT_TIMEOUT", "2")),
         'PAGE_LOAD_TIMEOUT': int(os.getenv("PAGE_LOAD_TIMEOUT", "10")),
         'STOCK_CHECK_INTERVAL': float(os.getenv("STOCK_CHECK_INTERVAL", "0.2")),
+        'PAYMENT_WAIT_TIME': int(os.getenv("PAYMENT_WAIT_TIME", "30")),  # 购买成功后等待用户付款的时间
     }
     
     # 验证必需配置
@@ -65,17 +67,16 @@ def create_fast_browser(config: Dict[str, Any]):
     
     # 性能参数
     performance_args = [
-        '--disable-blink-features=AutomationControlled',
         '--disable-dev-shm-usage',
-        '--no-sandbox',
         '--disable-gpu',
         '--disable-extensions',
         '--disable-plugins',
         '--disable-images',
-        '--disable-web-security',
         '--disable-features=TranslateUI',
         '--memory-pressure-off',
-        '--max_old_space_size=2048'
+        '--max_old_space_size=2048',
+        '--hide-crash-restore-bubble',
+        '--start-maximized'
     ]
 
     for arg in performance_args:
@@ -83,7 +84,10 @@ def create_fast_browser(config: Dict[str, Any]):
 
     # 应用Linux环境优化
     co = apply_linux_optimizations(co, 'performance')
-    
+
+    # 设置浏览器首选项
+    co.set_pref('credentials_enable_service', False)
+
     # 使用ChromiumPage而不是Chromium（DrissionPage官方推荐）
     page = ChromiumPage(co)
 
@@ -213,11 +217,11 @@ def ultra_fast_stock_check(page) -> bool:
         return False
 
 def lightning_purchase(page, config: Dict[str, Any]) -> bool:
-    """闪电购买"""
+    """闪电购买 - 安全版本，避免在结算过程中被中断"""
     try:
         pinner = Pinner()
         pinner.pin('闪电购买开始')
-        
+
         # 步骤1: 点击购买按钮
         buy_selectors = [
             '#btnCompleteProductConfig',
@@ -225,7 +229,7 @@ def lightning_purchase(page, config: Dict[str, Any]) -> bool:
             'text:Add to Cart',
             'text:立即购买'
         ]
-        
+
         clicked = False
         for selector in buy_selectors:
             try:
@@ -236,34 +240,36 @@ def lightning_purchase(page, config: Dict[str, Any]) -> bool:
                     break
             except:
                 continue
-        
+
         if not clicked:
             logging.warning("未找到购买按钮")
             return False
-        
+
         pinner.pin('点击购买按钮')
-        
-        # 最小等待
-        time.sleep(0.1)
-        
-        # 步骤2: 处理条款（如果存在）
+
+        # 步骤2: 等待页面响应和系统验证
+        logging.info("等待5秒进行系统验证（反机器人验证、库存检查等）...")
+        time.sleep(5)  # 等待5秒确保系统验证通过（反机器人验证、库存检查等）
+        logging.info("系统验证等待完成")
+
+        # 步骤3: 处理条款（如果存在）
         tos_selectors = [
             '#tos-checkbox',
             '.tos-checkbox',
             'input[name="tos"]',
             'text:I agree'
         ]
-        
+
         for selector in tos_selectors:
             try:
-                if page.s_ele(selector, timeout=0.1):
+                if page.s_ele(selector, timeout=0.5):
                     page(selector).click()
                     logging.info(f"点击条款: {selector}")
                     break
             except:
                 continue
-        
-        # 步骤3: 点击结算
+
+        # 步骤4: 点击结算并等待进入付款页面
         checkout_selectors = [
             '#checkout',
             '.checkout-btn',
@@ -271,22 +277,88 @@ def lightning_purchase(page, config: Dict[str, Any]) -> bool:
             'text:结算',
             'text:立即支付'
         ]
-        
+
         for selector in checkout_selectors:
             try:
-                if page.s_ele(selector, timeout=0.5):
+                if page.s_ele(selector, timeout=1):
                     page(selector).click()
                     logging.info(f"点击结算: {selector}")
-                    pinner.pin('闪电购买完成')
-                    return True
+
+                    # 等待进入付款页面
+                    if wait_for_payment_page(page):
+                        pinner.pin('闪电购买完成 - 已进入付款页面')
+                        logging.info("已进入付款页面，请在浏览器中完成付款...")
+
+                        # 不立即返回，让用户有时间看到付款页面
+                        # 这里不做额外等待，让主循环处理等待逻辑
+                        return True
+                    else:
+                        logging.warning("未能进入付款页面")
+                        return False
             except:
                 continue
-        
+
         logging.warning("未找到结算按钮")
         return False
-        
+
     except Exception as e:
         logging.error(f"闪电购买错误: {e}")
+        return False
+
+
+def wait_for_payment_page(page, max_wait_time: int = 15) -> bool:
+    """等待进入付款页面 - 缩短等待时间，避免阻塞太久"""
+    try:
+        # 付款页面的标识符
+        payment_indicators = [
+            'text:Payment',
+            'text:支付',
+            'text:付款',
+            '.payment-form',
+            '#payment-form',
+            'text:Credit Card',
+            'text:信用卡',
+            'text:PayPal',
+            'text:Order Summary',
+            'text:订单摘要',
+            'text:Total',
+            'text:总计',
+            'text:Billing',
+            'text:账单',
+            'text:Continue to Payment',
+            'text:继续付款'
+        ]
+
+        start_time = time.time()
+        logging.info("开始等待付款页面...")
+
+        while time.time() - start_time < max_wait_time:
+            # 检查是否已进入付款页面
+            for indicator in payment_indicators:
+                if page.s_ele(indicator, timeout=0.3):
+                    logging.info(f"检测到付款页面标识: {indicator}")
+                    return True
+
+            # 检查URL是否包含付款相关关键词
+            try:
+                current_url = page.url.lower()
+                payment_url_keywords = ['payment', 'checkout', 'order', 'cart', 'billing', 'pay']
+
+                for keyword in payment_url_keywords:
+                    if keyword in current_url:
+                        logging.info(f"URL包含付款关键词: {keyword} - {current_url}")
+                        return True
+            except:
+                pass
+
+            # 短暂等待后继续检查
+            time.sleep(0.5)
+
+        logging.warning(f"等待付款页面超时 ({max_wait_time}秒)")
+        return False
+
+    except Exception as e:
+        logging.error(f"等待付款页面错误: {e}")
         return False
 
 def simple_fast_monitor():
@@ -316,22 +388,32 @@ def simple_fast_monitor():
         while True:
             try:
                 total_checks += 1
-                
+
                 # 访问产品页面
                 page.get(config['PRODUCT_URL'])
-                
+
                 # 极短等待
                 time.sleep(config['STOCK_CHECK_INTERVAL'])
-                
+
                 # 超快速库存检查
                 if ultra_fast_stock_check(page):
                     logging.info(f"🎯 第 {total_checks} 次检查: 检测到库存！")
-                    
+
                     # 闪电购买
                     if lightning_purchase(page, config):
                         success_count += 1
                         logging.info(f"🎉 第 {success_count} 次抢单成功！")
-                        
+
+                        # 购买成功后，给用户足够时间完成付款
+                        wait_time = config['PAYMENT_WAIT_TIME']
+                        logging.info(f"购买成功，等待{wait_time}秒让用户完成付款...")
+                        time.sleep(wait_time)  # 给用户配置的时间完成付款
+
+                        # 如果配置为单次购买成功后停止，则退出循环
+                        if config.get('STOP_AFTER_SUCCESS', True):
+                            logging.info("购买成功，根据配置停止运行")
+                            break
+
                         # 成功后短暂休息
                         time.sleep(random.uniform(1, 2))
                     else:
@@ -342,7 +424,7 @@ def simple_fast_monitor():
                         runtime = time.time() - start_time
                         speed = total_checks / runtime if runtime > 0 else 0
                         logging.info(f"📊 已检查 {total_checks} 次，成功 {success_count} 次，速度 {speed:.2f} 次/秒")
-                
+
                 # 动态延迟
                 delay = config['DELAY_TIME'] + random.uniform(-0.05, 0.05)
                 time.sleep(max(0.05, delay))

@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import os
 from ..utils.TimePinner import Pinner
 from ..utils.linux_optimizer import apply_linux_optimizations
+
 from typing import Dict, Any
 import random
 
@@ -42,6 +43,8 @@ def load_stable_config() -> Dict[str, Any]:
         'PAGE_LOAD_TIMEOUT': int(os.getenv("PAGE_LOAD_TIMEOUT", "15")),
         'STOCK_CHECK_INTERVAL': float(os.getenv("STOCK_CHECK_INTERVAL", "0.5")),
         'LOGIN_CHECK_INTERVAL': int(os.getenv("LOGIN_CHECK_INTERVAL", "20")),  # 每20次检查登录
+        'PAYMENT_WAIT_TIME': int(os.getenv("PAYMENT_WAIT_TIME", "45")),  # 购买成功后等待用户付款的时间（稳定模式更长）
+
     }
     
     # 验证必需配置
@@ -67,8 +70,8 @@ def create_stable_browser(config: Dict[str, Any]):
     stability_args = [
         '--disable-blink-features=AutomationControlled',
         '--disable-dev-shm-usage',
-        '--no-sandbox',
         '--disable-web-security',
+        '--hide-crash-restore-bubble',
         '--start-maximized'
     ]
 
@@ -77,6 +80,10 @@ def create_stable_browser(config: Dict[str, Any]):
 
     # 应用Linux环境优化（稳定性模式）
     co = apply_linux_optimizations(co, 'stability')
+
+    # 设置浏览器首选项
+    co.set_pref('credentials_enable_service', False)
+
     
     # 使用ChromiumPage而不是Chromium（DrissionPage官方推荐）
     page = ChromiumPage(co)
@@ -339,12 +346,14 @@ def stable_stock_check(page) -> bool:
         logging.debug(f"库存检查错误: {e}")
         return False
 
+
+
 def stable_purchase(page, config: Dict[str, Any]) -> bool:
-    """稳定的购买流程"""
+    """稳定的购买流程 - 安全版本，避免在结算过程中被中断"""
     try:
         pinner = Pinner()
         pinner.pin('稳定购买开始')
-        
+
         # 步骤1: 点击购买按钮
         buy_selectors = [
             '#btnCompleteProductConfig',
@@ -353,7 +362,7 @@ def stable_purchase(page, config: Dict[str, Any]) -> bool:
             'text:立即购买',
             'text:加入购物车'
         ]
-        
+
         clicked = False
         for selector in buy_selectors:
             try:
@@ -365,17 +374,24 @@ def stable_purchase(page, config: Dict[str, Any]) -> bool:
                     break
             except:
                 continue
-        
+
         if not clicked:
             logging.warning("未找到购买按钮")
             return False
-        
+
         pinner.pin('点击购买按钮')
-        
-        # 等待页面响应
-        time.sleep(2)
-        
-        # 步骤2: 处理条款（如果存在）
+
+        # 步骤2: 等待页面响应和系统验证
+        logging.info("等待5秒进行系统验证（反机器人验证、库存检查等）...")
+        time.sleep(5)  # 等待5秒确保系统验证通过（反机器人验证、库存检查等）
+        logging.info("系统验证等待完成")
+
+        # 步骤3: 等待页面稳定
+        time.sleep(2)  # 稳定模式额外等待时间
+
+        pinner.pin('页面稳定完成')
+
+        # 步骤4: 处理条款（如果存在）
         tos_selectors = [
             '#tos-checkbox',
             '.tos-checkbox',
@@ -383,18 +399,18 @@ def stable_purchase(page, config: Dict[str, Any]) -> bool:
             'text:I agree',
             'text:同意条款'
         ]
-        
+
         for selector in tos_selectors:
             try:
-                element = page.s_ele(selector, timeout=1)
+                element = page.s_ele(selector, timeout=2)
                 if element:
                     page(selector).click()
                     logging.info(f"点击条款: {selector}")
                     break
             except:
                 continue
-        
-        # 步骤3: 点击结算
+
+        # 步骤5: 点击结算并等待进入付款页面
         checkout_selectors = [
             '#checkout',
             '.checkout-btn',
@@ -402,23 +418,86 @@ def stable_purchase(page, config: Dict[str, Any]) -> bool:
             'text:结算',
             'text:立即支付'
         ]
-        
+
         for selector in checkout_selectors:
             try:
                 element = page.s_ele(selector, timeout=3)
                 if element:
                     page(selector).click()
                     logging.info(f"点击结算: {selector}")
-                    pinner.pin('稳定购买完成')
-                    return True
+
+                    # 等待进入付款页面
+                    if wait_for_payment_page_stable(page):
+                        pinner.pin('稳定购买完成 - 已进入付款页面')
+                        logging.info("已进入付款页面，请在浏览器中完成付款...")
+
+                        # 不立即返回，让用户有时间看到付款页面
+                        # 这里不做额外等待，让主循环处理等待逻辑
+                        return True
+                    else:
+                        logging.warning("未能进入付款页面")
+                        return False
             except:
                 continue
-        
+
         logging.warning("未找到结算按钮")
         return False
-        
+
     except Exception as e:
         logging.error(f"稳定购买错误: {e}")
+        return False
+
+
+def wait_for_payment_page_stable(page, max_wait_time: int = 45) -> bool:
+    """等待进入付款页面 - 稳定版本，等待时间更长"""
+    try:
+        # 付款页面的标识符
+        payment_indicators = [
+            'text:Payment',
+            'text:支付',
+            'text:付款',
+            '.payment-form',
+            '#payment-form',
+            'text:Credit Card',
+            'text:信用卡',
+            'text:PayPal',
+            'text:Order Summary',
+            'text:订单摘要',
+            'text:Total',
+            'text:总计',
+            'text:Billing',
+            'text:账单'
+        ]
+
+        start_time = time.time()
+
+        while time.time() - start_time < max_wait_time:
+            # 检查是否已进入付款页面
+            for indicator in payment_indicators:
+                if page.s_ele(indicator, timeout=1):
+                    logging.info(f"检测到付款页面标识: {indicator}")
+                    return True
+
+            # 检查URL是否包含付款相关关键词
+            try:
+                current_url = page.url.lower()
+                payment_url_keywords = ['payment', 'checkout', 'order', 'cart', 'billing', 'invoice']
+
+                for keyword in payment_url_keywords:
+                    if keyword in current_url:
+                        logging.info(f"URL包含付款关键词: {keyword}")
+                        return True
+            except:
+                pass
+
+            # 稳定模式等待时间更长
+            time.sleep(1)
+
+        logging.warning("等待付款页面超时")
+        return False
+
+    except Exception as e:
+        logging.error(f"等待付款页面错误: {e}")
         return False
 
 def stable_monitor():
@@ -462,19 +541,29 @@ def stable_monitor():
                 
                 # 访问产品页面
                 page.get(config['PRODUCT_URL'])
-                
+
                 # 稳定等待
                 time.sleep(config['STOCK_CHECK_INTERVAL'])
-                
+
                 # 稳定库存检查
                 if stable_stock_check(page):
                     logging.info(f"🎯 第 {total_checks} 次检查: 检测到库存！")
-                    
+
                     # 稳定购买
                     if stable_purchase(page, config):
                         success_count += 1
                         logging.info(f"🎉 第 {success_count} 次抢单成功！")
-                        
+
+                        # 购买成功后，给用户足够时间完成付款
+                        wait_time = config['PAYMENT_WAIT_TIME']
+                        logging.info(f"购买成功，等待{wait_time}秒让用户完成付款...")
+                        time.sleep(wait_time)  # 给用户配置的时间完成付款
+
+                        # 如果配置为单次购买成功后停止，则退出循环
+                        if config.get('STOP_AFTER_SUCCESS', True):
+                            logging.info("购买成功，根据配置停止运行")
+                            break
+
                         # 成功后休息
                         time.sleep(random.uniform(2, 5))
                     else:
@@ -485,7 +574,7 @@ def stable_monitor():
                         runtime = time.time() - start_time
                         speed = total_checks / runtime if runtime > 0 else 0
                         logging.info(f"📊 已检查 {total_checks} 次，成功 {success_count} 次，速度 {speed:.2f} 次/秒")
-                
+
                 # 稳定延迟
                 delay = config['DELAY_TIME'] + random.uniform(-0.1, 0.1)
                 time.sleep(max(0.1, delay))

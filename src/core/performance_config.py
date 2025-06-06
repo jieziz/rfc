@@ -29,6 +29,7 @@ class PerformanceConfig:
                 'QUICK_PURCHASE': True,
                 'BROWSER_POOL_SIZE': 3,
                 'MAX_WORKERS': 5,
+                'STOP_AFTER_SUCCESS': True,  # 成功后停止
             }
         },
 
@@ -48,6 +49,7 @@ class PerformanceConfig:
                 'QUICK_PURCHASE': False,
                 'BROWSER_POOL_SIZE': 1,
                 'MAX_WORKERS': 2,
+                'STOP_AFTER_SUCCESS': True,  # 成功后停止
             }
         },
 
@@ -67,6 +69,7 @@ class PerformanceConfig:
                 'QUICK_PURCHASE': True,
                 'BROWSER_POOL_SIZE': 5,
                 'MAX_WORKERS': 8,
+                'STOP_AFTER_SUCCESS': True,  # 成功后停止
             }
         }
     }
