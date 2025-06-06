@@ -256,7 +256,7 @@ collect_user_input() {
     echo
     print_info "请确认您的配置信息："
     echo "邮箱: $USER_EMAIL"
-    echo "密码: $(echo "$USER_PASSWORD" | sed 's/./*/g')"
+    echo "密码: $USER_PASSWORD"
     echo "商品PID: $PRODUCT_PID"
     echo
 

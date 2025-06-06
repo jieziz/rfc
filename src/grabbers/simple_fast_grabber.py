@@ -6,7 +6,7 @@
 
 import logging
 import time
-from DrissionPage import Chromium, ChromiumOptions
+from DrissionPage import ChromiumPage, ChromiumOptions
 from dotenv import load_dotenv
 import os
 from ..utils.TimePinner import Pinner
@@ -84,13 +84,13 @@ def create_fast_browser(config: Dict[str, Any]):
     # 应用Linux环境优化
     co = apply_linux_optimizations(co, 'performance')
     
-    browser = Chromium(co)
-    page = browser.latest_tab
-    
+    # 使用ChromiumPage而不是Chromium（DrissionPage官方推荐）
+    page = ChromiumPage(co)
+
     # 设置超时
     page.set.timeouts(page_load=config['PAGE_LOAD_TIMEOUT'])
-    
-    return browser, page
+
+    return page, page  # 返回两次page保持兼容性
 
 def fast_login(page, config: Dict[str, Any]) -> bool:
     """快速登录"""
@@ -279,7 +279,7 @@ def simple_fast_monitor():
     logging.info(f"延迟时间: {config['DELAY_TIME']}秒")
     
     # 创建浏览器
-    browser, page = create_fast_browser(config)
+    _, page = create_fast_browser(config)
     
     try:
         # 快速登录
@@ -342,7 +342,7 @@ def simple_fast_monitor():
     finally:
         # 清理
         try:
-            browser.quit()
+            page.quit()
         except:
             pass
         

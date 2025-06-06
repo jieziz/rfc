@@ -11,7 +11,7 @@ import logging
 import time
 import threading
 from typing import Dict, Any, List, Optional
-from DrissionPage import Chromium, ChromiumOptions
+from DrissionPage import ChromiumPage, ChromiumOptions
 import queue
 import random
 from contextlib import contextmanager
@@ -74,8 +74,9 @@ class BrowserInstance:
             co.set_pref('profile.default_content_setting_values.notifications', 2)
             co.set_pref('profile.default_content_settings.popups', 0)
             
-            self.browser = Chromium(co)
-            self.page = self.browser.latest_tab
+            # 使用ChromiumPage而不是Chromium（DrissionPage官方推荐）
+            self.page = ChromiumPage(co)
+            self.browser = self.page  # 保持兼容性
 
             # 设置超时
             self.page.set.timeouts(
@@ -163,7 +164,7 @@ class BrowserInstance:
     def health_check(self) -> bool:
         """健康检查"""
         try:
-            if not self.browser or not self.page:
+            if not self.page:
                 return False
 
             # 检查浏览器是否还活着
@@ -189,8 +190,8 @@ class BrowserInstance:
     def destroy(self):
         """销毁浏览器实例"""
         try:
-            if self.browser:
-                self.browser.quit()
+            if self.page:
+                self.page.quit()
             self.is_healthy = False
             logging.info(f"浏览器实例 {self.instance_id} 已销毁")
         except Exception as e:

@@ -228,7 +228,7 @@ python src/grabbers/concurrent_grabber.py
    ```bash
    # 检查网络连接
    curl -I https://raw.githubusercontent.com/jieziz/rfc/main/install.sh
-   
+
    # 手动下载并执行
    wget https://raw.githubusercontent.com/jieziz/rfc/main/install.sh
    chmod +x install.sh
@@ -247,6 +247,34 @@ python src/grabbers/concurrent_grabber.py
    # macOS使用Homebrew
    brew install --cask chromium
    ```
+
+### 🐧 Linux无头模式检查
+
+在Linux服务器环境中，由于没有图形界面，需要特殊方法确认浏览器是否正常运行：
+
+#### 系统级检查
+```bash
+# 检查浏览器进程
+ps aux | grep -i chrome | grep headless
+
+# 查看应用日志
+tail -f simple_fast.log
+tail -f stable_grabber.log
+tail -f concurrent_log.log
+
+# 搜索关键信息
+grep -i "浏览器" *.log
+grep -i "登录" *.log
+```
+
+> 💡 **检查要点**:
+> - ✅ 能检测到Chrome/Chromium进程
+> - ✅ 进程包含`--headless`和`--no-sandbox`参数
+> - ✅ CPU和内存使用正常
+> - ✅ 日志中显示"浏览器设置完成"、"登录成功"等信息
+> - ✅ 无严重错误信息
+
+详细的Linux无头模式配置和故障排除，请参考：[Linux无头模式指南](docs/LINUX_HEADLESS_GUIDE.md)
 
 ## 🆕 最新改进
 

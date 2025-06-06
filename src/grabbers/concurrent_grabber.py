@@ -11,7 +11,7 @@ import logging
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from DrissionPage import Chromium, ChromiumOptions
+from DrissionPage import ChromiumPage, ChromiumOptions
 from dotenv import load_dotenv
 import os
 import random
@@ -99,8 +99,9 @@ class BrowserWorker:
             # 应用Linux环境优化
             co = apply_linux_optimizations(co, 'performance')
             
-            self.browser = Chromium(co)
-            self.page = self.browser.latest_tab
+            # 使用ChromiumPage而不是Chromium（DrissionPage官方推荐）
+            self.page = ChromiumPage(co)
+            self.browser = self.page  # 保持兼容性
             
             # 快速登录
             self._quick_login()
@@ -240,9 +241,9 @@ class BrowserWorker:
     def stop(self):
         """停止工作器"""
         self.is_running = False
-        if self.browser:
+        if self.page:
             try:
-                self.browser.quit()
+                self.page.quit()
             except:
                 pass
 

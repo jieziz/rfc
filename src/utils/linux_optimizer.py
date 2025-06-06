@@ -86,7 +86,7 @@ def get_linux_headless_args(mode: str = 'performance') -> List[str]:
 def get_linux_environment_info() -> Dict[str, Any]:
     """
     获取Linux环境信息
-    
+
     Returns:
         Dict[str, Any]: 环境信息字典
     """
@@ -98,9 +98,10 @@ def get_linux_environment_info() -> Dict[str, Any]:
         'xdg_session_type': os.environ.get('XDG_SESSION_TYPE'),
         'desktop_session': os.environ.get('DESKTOP_SESSION'),
         'has_xvfb': False,
-        'memory_info': {}
+        'memory_info': {},
+        'browser_processes': []
     }
-    
+
     # 检查Xvfb是否可用
     try:
         import subprocess
@@ -120,14 +121,19 @@ def get_linux_environment_info() -> Dict[str, Any]:
                     info['memory_info']['available'] = int(line.split()[1]) * 1024
     except Exception:
         pass
-    
+
+
+
     return info
+
+
+
 
 
 def log_environment_info():
     """记录环境信息到日志"""
     info = get_linux_environment_info()
-    
+
     if info['is_linux']:
         logging.info("Linux环境检测结果:")
         logging.info(f"  - 无头环境: {info['is_headless']}")
@@ -135,40 +141,53 @@ def log_environment_info():
         logging.info(f"  - Wayland: {info['wayland_display'] or 'None'}")
         logging.info(f"  - 会话类型: {info['xdg_session_type'] or 'Unknown'}")
         logging.info(f"  - Xvfb可用: {info['has_xvfb']}")
-        
+
         if info['memory_info']:
             total_mb = info['memory_info'].get('total', 0) // (1024 * 1024)
             available_mb = info['memory_info'].get('available', 0) // (1024 * 1024)
             logging.info(f"  - 内存: {total_mb}MB 总计, {available_mb}MB 可用")
 
 
+
+
 def apply_linux_optimizations(chromium_options, mode: str = 'performance'):
     """
     为ChromiumOptions应用Linux优化
-    
+    根据DrissionPage官方文档的无头模式最佳实践
+
     Args:
         chromium_options: DrissionPage的ChromiumOptions对象
         mode: 优化模式 ('performance', 'stability', 'minimal')
     """
     if not is_linux_headless_environment():
         return chromium_options
-    
-    # 获取优化参数
-    args = get_linux_headless_args(mode)
-    
-    # 应用参数
-    for arg in args:
-        chromium_options.set_argument(arg)
-    
-    # 强制启用无头模式
+
+    # 核心无头模式配置（根据DrissionPage官方文档）
+    # 1. 关闭沙箱模式，解决 $DISPLAY 报错
+    chromium_options.set_argument('--no-sandbox')
+
+    # 2. 开启无头模式，解决浏览器无法连接报错
     chromium_options.headless()
-    
+
+    # 3. 添加其他必要的无头模式参数
+    chromium_options.set_argument('--disable-dev-shm-usage')  # 解决共享内存问题
+    chromium_options.set_argument('--disable-gpu')           # 禁用GPU加速
+
+    # 获取额外的优化参数
+    args = get_linux_headless_args(mode)
+
+    # 应用额外参数
+    for arg in args:
+        # 避免重复添加已设置的参数
+        if arg not in ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']:
+            chromium_options.set_argument(arg)
+
     # 设置虚拟显示大小（如果需要）
     if not os.environ.get('DISPLAY'):
         chromium_options.set_argument('--window-size=1920,1080')
         chromium_options.set_argument('--virtual-time-budget=5000')
-    
-    logging.info(f"已应用Linux无头环境优化 (模式: {mode})")
+
+    logging.info(f"已应用Linux无头环境优化 (模式: {mode}) - 使用DrissionPage最佳实践")
     return chromium_options
 
 
@@ -213,19 +232,22 @@ def setup_virtual_display():
 def cleanup_virtual_display(pid: int):
     """
     清理虚拟显示
-    
+
     Args:
         pid: Xvfb进程ID
     """
     if pid is None:
         return
-    
+
     try:
         import signal
         os.kill(pid, signal.SIGTERM)
         logging.info(f"虚拟显示已清理 (PID: {pid})")
     except Exception as e:
         logging.warning(f"清理虚拟显示失败: {e}")
+
+
+
 
 
 # 使用示例

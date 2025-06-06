@@ -5,7 +5,7 @@
 
 import logging
 import time
-from DrissionPage import Chromium, ChromiumOptions
+from DrissionPage import ChromiumPage, ChromiumOptions
 from dotenv import load_dotenv
 import os
 from ..utils.TimePinner import Pinner
@@ -78,13 +78,13 @@ def create_stable_browser(config: Dict[str, Any]):
     # 应用Linux环境优化（稳定性模式）
     co = apply_linux_optimizations(co, 'stability')
     
-    browser = Chromium(co)
-    page = browser.latest_tab
-    
+    # 使用ChromiumPage而不是Chromium（DrissionPage官方推荐）
+    page = ChromiumPage(co)
+
     # 设置较长的超时时间
     page.set.timeouts(page_load=config['PAGE_LOAD_TIMEOUT'])
-    
-    return browser, page
+
+    return page, page  # 返回两次page保持兼容性
 
 def stable_login(page, config: Dict[str, Any]) -> bool:
     """稳定的登录流程"""
@@ -367,7 +367,7 @@ def stable_monitor():
     logging.info(f"无头模式: {config['HEADLESS_MODE']}")
     
     # 创建浏览器
-    browser, page = create_stable_browser(config)
+    _, page = create_stable_browser(config)
     
     try:
         # 稳定登录
@@ -439,7 +439,7 @@ def stable_monitor():
     finally:
         # 清理
         try:
-            browser.quit()
+            page.quit()
         except:
             pass
         
