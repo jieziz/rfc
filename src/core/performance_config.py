@@ -11,28 +11,11 @@ from dotenv import load_dotenv
 class PerformanceConfig:
     """性能配置管理器"""
     
-    # 预设配置模式
+    # 预设配置模式 (简化版)
     PRESETS = {
-        'ultra_fast': {
-            'name': '极速模式',
-            'description': '最快速度，适合网络良好的环境',
-            'config': {
-                'DELAY_TIME': 0.1,
-                'ELEMENT_TIMEOUT': 1,
-                'PAGE_LOAD_TIMEOUT': 5,
-                'PAGE_LOAD_WAIT': 0.2,
-                'ELEMENT_WAIT': 0.05,
-                'STOCK_CHECK_INTERVAL': 0.1,
-                'CONCURRENT_BROWSERS': 5,
-                'HEADLESS_MODE': True,
-                'FAST_MODE': True,
-                'QUICK_PURCHASE': True,
-            }
-        },
-        
         'fast': {
-            'name': '快速模式',
-            'description': '平衡速度和稳定性',
+            'name': '简化快速模式',
+            'description': '最稳定的快速版本 (强烈推荐)',
             'config': {
                 'DELAY_TIME': 0.3,
                 'ELEMENT_TIMEOUT': 2,
@@ -44,29 +27,14 @@ class PerformanceConfig:
                 'HEADLESS_MODE': True,
                 'FAST_MODE': True,
                 'QUICK_PURCHASE': True,
+                'BROWSER_POOL_SIZE': 3,
+                'MAX_WORKERS': 5,
             }
         },
-        
-        'balanced': {
-            'name': '平衡模式',
-            'description': '速度和稳定性平衡，推荐使用',
-            'config': {
-                'DELAY_TIME': 0.5,
-                'ELEMENT_TIMEOUT': 3,
-                'PAGE_LOAD_TIMEOUT': 10,
-                'PAGE_LOAD_WAIT': 1,
-                'ELEMENT_WAIT': 0.2,
-                'STOCK_CHECK_INTERVAL': 0.3,
-                'CONCURRENT_BROWSERS': 2,
-                'HEADLESS_MODE': True,
-                'FAST_MODE': True,
-                'QUICK_PURCHASE': True,
-            }
-        },
-        
+
         'stable': {
             'name': '稳定模式',
-            'description': '优先稳定性，适合网络不稳定的环境',
+            'description': '超高稳定性，确保登录 (网络不稳定时使用)',
             'config': {
                 'DELAY_TIME': 1,
                 'ELEMENT_TIMEOUT': 5,
@@ -78,33 +46,37 @@ class PerformanceConfig:
                 'HEADLESS_MODE': False,
                 'FAST_MODE': False,
                 'QUICK_PURCHASE': False,
+                'BROWSER_POOL_SIZE': 1,
+                'MAX_WORKERS': 2,
             }
         },
-        
-        'debug': {
-            'name': '调试模式',
-            'description': '用于调试和测试',
+
+        'concurrent': {
+            'name': '并发模式',
+            'description': '多浏览器并发抢单 (高性能机器)',
             'config': {
-                'DELAY_TIME': 2,
-                'ELEMENT_TIMEOUT': 10,
-                'PAGE_LOAD_TIMEOUT': 30,
-                'PAGE_LOAD_WAIT': 3,
-                'ELEMENT_WAIT': 1,
-                'STOCK_CHECK_INTERVAL': 1,
-                'CONCURRENT_BROWSERS': 1,
-                'HEADLESS_MODE': False,
-                'FAST_MODE': False,
-                'QUICK_PURCHASE': False,
+                'DELAY_TIME': 0.2,
+                'ELEMENT_TIMEOUT': 2,
+                'PAGE_LOAD_TIMEOUT': 8,
+                'PAGE_LOAD_WAIT': 0.3,
+                'ELEMENT_WAIT': 0.1,
+                'STOCK_CHECK_INTERVAL': 0.15,
+                'CONCURRENT_BROWSERS': 5,
+                'HEADLESS_MODE': True,
+                'FAST_MODE': True,
+                'QUICK_PURCHASE': True,
+                'BROWSER_POOL_SIZE': 5,
+                'MAX_WORKERS': 8,
             }
         }
     }
     
-    def __init__(self, mode: str = 'balanced'):
+    def __init__(self, mode: str = 'fast'):
         """
         初始化性能配置
-        
+
         Args:
-            mode: 配置模式 ('ultra_fast', 'fast', 'balanced', 'stable', 'debug')
+            mode: 配置模式 ('fast', 'stable', 'concurrent')
         """
         load_dotenv(override=True)
         self.mode = mode
@@ -126,7 +98,7 @@ class PerformanceConfig:
         if self.mode in self.PRESETS:
             preset_config = self.PRESETS[self.mode]['config']
         else:
-            preset_config = self.PRESETS['balanced']['config']
+            preset_config = self.PRESETS['fast']['config']  # 默认使用快速模式
         
         # 合并配置，环境变量优先
         final_config = {}

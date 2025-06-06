@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # =============================================================================
-# RFC Auto Grabber - 智能部署和检查脚本
+# RFC Auto Grabber - 一键部署脚本
 # 支持 Windows Git Bash、Linux、macOS 多平台自动部署
+# 支持远程一条命令安装: bash <(curl -Ls https://raw.githubusercontent.com/jieziz/rfc/main/scripts/deploy.sh)
 # 从GitHub自动拉取代码并交互式配置启动
 # 集成安装检查功能
 # =============================================================================
@@ -24,11 +25,28 @@ NC='\033[0m' # No Color
 # 项目信息
 PROJECT_NAME="RFC Auto Grabber"
 GITHUB_REPO="https://github.com/jieziz/rfc.git"
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GITHUB_RAW_URL="https://raw.githubusercontent.com/jieziz/rfc/main"
+
+# 动态设置项目目录
+if [[ -n "${BASH_SOURCE[0]}" && "${BASH_SOURCE[0]}" != "/dev/stdin" ]]; then
+    # 本地执行
+    PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+    # 远程执行
+    PROJECT_DIR="$(pwd)/rfc-auto-grabber"
+    mkdir -p "$PROJECT_DIR"
+fi
+
 REPO_DIR="$PROJECT_DIR/rfc_repo"
 PYTHON_VERSION="3.8"
 VENV_DIR="$PROJECT_DIR/venv"
 LOG_FILE="$PROJECT_DIR/deploy.log"
+
+# 检测是否为远程执行
+REMOTE_INSTALL=false
+if [[ "${BASH_SOURCE[0]}" == "/dev/stdin" ]] || [[ -z "${BASH_SOURCE[0]}" ]]; then
+    REMOTE_INSTALL=true
+fi
 
 # 全局变量
 OS=""
@@ -814,6 +832,24 @@ parse_arguments() {
     done
 }
 
+# 显示远程安装信息
+show_remote_install_info() {
+    if [[ "$REMOTE_INSTALL" == "true" ]]; then
+        echo -e "${CYAN}"
+        echo "=============================================="
+        echo "    RFC Auto Grabber - 一键远程安装"
+        echo "=============================================="
+        echo -e "${NC}"
+        echo
+        print_info "🌐 远程安装模式已启用"
+        print_info "📁 安装目录: $PROJECT_DIR"
+        print_info "📦 将从GitHub自动拉取最新代码"
+        echo
+        print_step "开始远程安装流程..."
+        echo
+    fi
+}
+
 # 显示帮助信息
 show_help() {
     echo -e "${CYAN}"
@@ -833,6 +869,9 @@ show_help() {
     echo "  $0              # 执行完整部署"
     echo "  $0 --check      # 仅检查安装状态"
     echo "  $0 --deploy     # 执行完整部署"
+    echo
+    echo "远程一键安装:"
+    echo "  bash <(curl -Ls https://raw.githubusercontent.com/jieziz/rfc/main/scripts/deploy.sh)"
     echo
 }
 
@@ -1088,12 +1127,18 @@ main() {
             ;;
         "deploy")
             clear
-            echo -e "${CYAN}"
-            echo "=============================================="
-            echo "    RFC Auto Grabber - 智能部署脚本"
-            echo "    支持从GitHub自动拉取并配置启动"
-            echo "=============================================="
-            echo -e "${NC}"
+
+            # 显示远程安装信息（如果适用）
+            show_remote_install_info
+
+            if [[ "$REMOTE_INSTALL" != "true" ]]; then
+                echo -e "${CYAN}"
+                echo "=============================================="
+                echo "    RFC Auto Grabber - 智能部署脚本"
+                echo "    支持从GitHub自动拉取并配置启动"
+                echo "=============================================="
+                echo -e "${NC}"
+            fi
 
             # 初始化日志
             echo "部署开始: $(date)" > "$LOG_FILE"

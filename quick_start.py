@@ -35,24 +35,21 @@ def show_modes():
     """显示可用模式"""
     print("\n📋 可用的抢单模式:")
     print("=" * 60)
-    
+
     modes = {
         '1': ('simple_fast', '简化快速模式', '最稳定的快速版本 (强烈推荐)'),
-        '2': ('fast', '快速模式', '平衡速度和稳定性'),
-        '3': ('ultra_fast', '极速模式', '最快速度，适合网络良好环境'),
-        '4': ('balanced', '平衡模式', '速度和稳定性平衡'),
-        '5': ('stable_new', '新稳定模式', '专门的稳定版，确保登录 (推荐网络不稳定时使用)'),
-        '6': ('stable', '稳定模式', '超级抢单器稳定版'),
-        '7': ('concurrent', '并发模式', '多浏览器并发抢单'),
-        '8': ('debug', '调试模式', '用于调试和测试'),
-        '9': ('original', '原版模式', '使用原始脚本')
+        '2': ('stable', '稳定模式', '超高稳定性，确保登录 (网络不稳定时使用)'),
+        '3': ('concurrent', '并发模式', '多浏览器并发抢单 (高性能机器)')
     }
-    
+
     for key, (mode, name, desc) in modes.items():
-        print(f"{key}. {name} ({mode})")
+        print(f"{key}. {name}")
         print(f"   {desc}")
         print()
-    
+
+    print("💡 推荐使用: 大多数情况下建议使用 简化快速模式")
+    print()
+
     return modes
 
 def check_config():
@@ -133,32 +130,28 @@ def run_script(script_name: str, mode: str = None):
 def show_performance_tips():
     """显示性能优化建议"""
     tips = """
-💡 性能优化建议:
+💡 模式选择建议:
 
-1. 网络优化:
+1. 简化快速模式 (推荐):
+   - 适合大多数用户
+   - 平衡速度和稳定性
+   - 网络要求: 一般
+
+2. 稳定模式:
+   - 网络不稳定时使用
+   - 优先保证成功率
+   - 速度较慢但更可靠
+
+3. 并发模式:
+   - 需要高性能机器 (8GB+ 内存)
+   - 多浏览器同时抢购
+   - 网络要求: 良好
+
+💡 系统优化建议:
+   - 关闭不必要的后台程序
    - 使用有线网络连接
    - 确保网络延迟低于50ms
-   - 关闭其他占用带宽的应用
-
-2. 系统优化:
-   - 关闭不必要的后台程序
-   - 确保有足够的内存 (建议8GB+)
-   - 使用SSD硬盘
-
-3. 配置优化:
-   - 极速模式: 网络良好时使用
-   - 快速模式: 日常使用推荐
-   - 稳定模式: 网络不稳定时使用
-
-4. 并发设置:
-   - 并发浏览器数量: 3-5个 (根据CPU性能调整)
-   - 检查间隔: 0.1-0.3秒
-   - 延迟时间: 0.1-0.5秒
-
-5. 监控建议:
-   - 观察日志输出
-   - 监控成功率
-   - 调整参数优化性能
+   - 观察日志输出调整参数
     """
     print(tips)
 
@@ -175,8 +168,8 @@ def main():
         modes = show_modes()
         
         try:
-            choice = input("请选择模式 (1-9) 或输入 'h' 查看帮助, 'q' 退出: ").strip().lower()
-            
+            choice = input("请选择模式 (1-3) 或输入 'h' 查看帮助, 'q' 退出: ").strip().lower()
+
             if choice == 'q':
                 print("👋 再见！")
                 break
@@ -201,29 +194,12 @@ def main():
             if choice == '1':  # simple_fast
                 optimize_config('fast')
                 run_script('src/grabbers/simple_fast_grabber.py')
-            elif choice == '2':  # fast
-                optimize_config('fast')
-                run_script('src/grabbers/super_grabber.py', 'fast')
-            elif choice == '3':  # ultra_fast
-                optimize_config('ultra_fast')
-                run_script('src/grabbers/super_grabber.py', 'ultra_fast')
-            elif choice == '4':  # balanced
-                optimize_config('balanced')
-                run_script('src/grabbers/super_grabber.py', 'balanced')
-            elif choice == '5':  # stable_new
+            elif choice == '2':  # stable
                 optimize_config('stable')
                 run_script('src/grabbers/stable_grabber.py')
-            elif choice == '6':  # stable
-                optimize_config('stable')
-                run_script('src/grabbers/super_grabber.py', 'stable')
-            elif choice == '7':  # concurrent
+            elif choice == '3':  # concurrent
                 optimize_config('fast')
                 run_script('src/grabbers/concurrent_grabber.py')
-            elif choice == '8':  # debug
-                optimize_config('debug')
-                run_script('src/grabbers/super_grabber.py', 'debug')
-            elif choice == '9':  # original
-                run_script('src/grabbers/auto.py')
             
             print("\n" + "="*60)
             
