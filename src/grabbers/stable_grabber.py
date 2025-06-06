@@ -118,29 +118,70 @@ def stable_login(page, config: Dict[str, Any]) -> bool:
         # 输入邮箱 - 多次尝试
         email_success = False
         for attempt in range(3):
+            logging.info(f"尝试第 {attempt + 1} 次邮箱输入...")
+
             for selector in email_selectors:
                 try:
                     element = page.s_ele(selector, timeout=3)
                     if element:
-                        page(selector).click()  # 先点击获得焦点
+                        logging.info(f"找到邮箱输入框: {selector}")
+
+                        # 清空输入框
+                        page(selector).clear()
                         time.sleep(0.5)
+
+                        # 点击获得焦点
+                        page(selector).click()
+                        time.sleep(0.5)
+
+                        # 输入邮箱
                         page(selector).input(config['EMAIL'])
-                        logging.info(f"成功输入邮箱: {selector}")
-                        email_success = True
-                        break
+                        time.sleep(0.5)
+
+                        # 验证输入是否成功
+                        current_value = page(selector).value
+                        if current_value and config['EMAIL'] in current_value:
+                            logging.info(f"成功输入邮箱: {selector}")
+                            email_success = True
+                            break
+                        else:
+                            logging.warning(f"邮箱输入验证失败，当前值: {current_value}")
+                    else:
+                        logging.debug(f"未找到邮箱输入框: {selector}")
                 except Exception as e:
                     logging.debug(f"输入邮箱失败 {selector}: {e}")
                     continue
-            
+
             if email_success:
                 break
-            
+
             if attempt < 2:
                 logging.warning(f"第 {attempt + 1} 次邮箱输入失败，重试...")
                 time.sleep(2)
-        
+
         if not email_success:
             logging.error("邮箱输入失败")
+            # 输出页面信息用于调试
+            try:
+                current_url = page.url
+                page_title = page.title
+                logging.error(f"当前页面: {current_url}")
+                logging.error(f"页面标题: {page_title}")
+
+                # 查找所有输入框
+                all_inputs = page.eles('tag:input')
+                logging.error(f"页面上找到 {len(all_inputs)} 个输入框")
+                for i, inp in enumerate(all_inputs[:5]):  # 只显示前5个
+                    try:
+                        inp_type = inp.attr('type') or 'text'
+                        inp_name = inp.attr('name') or 'unknown'
+                        inp_id = inp.attr('id') or 'unknown'
+                        logging.error(f"  输入框 {i+1}: type={inp_type}, name={inp_name}, id={inp_id}")
+                    except:
+                        pass
+            except Exception as e:
+                logging.error(f"获取调试信息失败: {e}")
+
             return False
         
         time.sleep(1)
@@ -148,27 +189,51 @@ def stable_login(page, config: Dict[str, Any]) -> bool:
         # 输入密码 - 多次尝试
         password_success = False
         for attempt in range(3):
+            logging.info(f"尝试第 {attempt + 1} 次密码输入...")
+
             for selector in password_selectors:
                 try:
                     element = page.s_ele(selector, timeout=3)
                     if element:
-                        page(selector).click()  # 先点击获得焦点
+                        logging.info(f"找到密码输入框: {selector}")
+
+                        # 清空输入框
+                        page(selector).clear()
                         time.sleep(0.5)
+
+                        # 点击获得焦点
+                        page(selector).click()
+                        time.sleep(0.5)
+
+                        # 输入密码
                         page(selector).input(config['PASSWORD'])
-                        logging.info(f"成功输入密码: {selector}")
-                        password_success = True
-                        break
+                        time.sleep(0.5)
+
+                        # 验证输入是否成功（密码框通常不能读取值，所以只检查是否有值）
+                        try:
+                            current_value = page(selector).value
+                            if current_value:  # 密码框有内容
+                                logging.info(f"成功输入密码: {selector}")
+                                password_success = True
+                                break
+                        except:
+                            # 有些密码框不允许读取值，假设输入成功
+                            logging.info(f"密码输入完成: {selector}")
+                            password_success = True
+                            break
+                    else:
+                        logging.debug(f"未找到密码输入框: {selector}")
                 except Exception as e:
                     logging.debug(f"输入密码失败 {selector}: {e}")
                     continue
-            
+
             if password_success:
                 break
-            
+
             if attempt < 2:
                 logging.warning(f"第 {attempt + 1} 次密码输入失败，重试...")
                 time.sleep(2)
-        
+
         if not password_success:
             logging.error("密码输入失败")
             return False
@@ -368,17 +433,18 @@ def stable_monitor():
     
     # 创建浏览器
     _, page = create_stable_browser(config)
-    
+
+    # 初始化变量
+    success_count = 0
+    total_checks = 0
+    start_time = time.time()
+    login_check_counter = 0
+
     try:
         # 稳定登录
         if not stable_login(page, config):
             logging.error("登录失败，退出")
             return
-        
-        success_count = 0
-        total_checks = 0
-        start_time = time.time()
-        login_check_counter = 0
         
         logging.info("开始稳定监控...")
         

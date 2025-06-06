@@ -114,31 +114,51 @@ def fast_login(page, config: Dict[str, Any]) -> bool:
         login_selectors = ['#login', 'button[type="submit"]', 'text:Login']
         
         # 输入邮箱
+        email_success = False
         for selector in email_selectors:
             try:
                 if page.s_ele(selector, timeout=0.5):
+                    page(selector).clear()
                     page(selector).input(config['EMAIL'])
+                    logging.info(f"快速输入邮箱: {selector}")
+                    email_success = True
                     break
             except:
                 continue
-        
+
+        if not email_success:
+            logging.warning("快速邮箱输入失败")
+
         # 输入密码
+        password_success = False
         for selector in password_selectors:
             try:
                 if page.s_ele(selector, timeout=0.5):
+                    page(selector).clear()
                     page(selector).input(config['PASSWORD'])
+                    logging.info(f"快速输入密码: {selector}")
+                    password_success = True
                     break
             except:
                 continue
-        
+
+        if not password_success:
+            logging.warning("快速密码输入失败")
+
         # 点击登录
+        login_clicked = False
         for selector in login_selectors:
             try:
                 if page.s_ele(selector, timeout=0.5):
                     page(selector).click()
+                    logging.info(f"快速点击登录: {selector}")
+                    login_clicked = True
                     break
             except:
                 continue
+
+        if not login_clicked:
+            logging.warning("快速登录点击失败")
         
         # 快速验证登录
         time.sleep(2)
