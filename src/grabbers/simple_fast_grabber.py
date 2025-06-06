@@ -68,16 +68,11 @@ def create_fast_browser(config: Dict[str, Any]):
     # 性能参数
     performance_args = [
         '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-extensions',
-        '--disable-plugins',
-        '--disable-images',
-        '--disable-features=TranslateUI',
-        '--memory-pressure-off',
-        '--max_old_space_size=2048',
         '--hide-crash-restore-bubble',
         '--start-maximized'
     ]
+
+    co.set_pref('credentials_enable_service', False)
 
     for arg in performance_args:
         co.set_argument(arg)

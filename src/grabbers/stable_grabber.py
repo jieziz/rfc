@@ -64,13 +64,11 @@ def create_stable_browser(config: Dict[str, Any]):
         co.headless()
     
     # 稳定性优先的配置
-    co.set_load_mode('normal')  # 正常加载模式，更稳定
+    co.set_load_mode('none')  # 正常加载模式，更稳定
     
     # 基础稳定性参数
     stability_args = [
-        '--disable-blink-features=AutomationControlled',
         '--disable-dev-shm-usage',
-        '--disable-web-security',
         '--hide-crash-restore-bubble',
         '--start-maximized'
     ]
