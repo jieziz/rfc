@@ -1,12 +1,16 @@
 #!/bin/bash
 
 # =============================================================================
-# RFC Auto Grabber - 智能部署脚本
+# RFC Auto Grabber - 智能部署和检查脚本
 # 支持 Windows Git Bash、Linux、macOS 多平台自动部署
 # 从GitHub自动拉取代码并交互式配置启动
+# 集成安装检查功能
 # =============================================================================
 
 set -e  # 遇到错误立即退出
+
+# 脚本模式
+SCRIPT_MODE="deploy"  # deploy, check, help
 
 # 颜色定义
 RED='\033[0;31m'
@@ -25,6 +29,10 @@ REPO_DIR="$PROJECT_DIR/rfc_repo"
 PYTHON_VERSION="3.8"
 VENV_DIR="$PROJECT_DIR/venv"
 LOG_FILE="$PROJECT_DIR/deploy.log"
+
+# 全局变量
+OS=""
+ISSUES_FOUND=0
 
 # 打印带颜色的消息
 print_message() {
@@ -781,45 +789,348 @@ show_completion_info() {
     print_success "祝您抢单成功！🚀"
 }
 
-# 主函数
-main() {
-    clear
+# 解析命令行参数
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -c|--check)
+                SCRIPT_MODE="check"
+                shift
+                ;;
+            -d|--deploy)
+                SCRIPT_MODE="deploy"
+                shift
+                ;;
+            -h|--help)
+                SCRIPT_MODE="help"
+                shift
+                ;;
+            *)
+                print_warning "未知参数: $1"
+                SCRIPT_MODE="help"
+                shift
+                ;;
+        esac
+    done
+}
+
+# 显示帮助信息
+show_help() {
     echo -e "${CYAN}"
     echo "=============================================="
-    echo "    RFC Auto Grabber - 智能部署脚本"
-    echo "    支持从GitHub自动拉取并配置启动"
+    echo "    RFC Auto Grabber - 智能部署和检查脚本"
+    echo "=============================================="
+    echo -e "${NC}"
+    echo
+    echo "用法: $0 [选项]"
+    echo
+    echo "选项:"
+    echo "  -d, --deploy    执行完整部署流程 (默认)"
+    echo "  -c, --check     仅执行安装检查"
+    echo "  -h, --help      显示此帮助信息"
+    echo
+    echo "示例:"
+    echo "  $0              # 执行完整部署"
+    echo "  $0 --check      # 仅检查安装状态"
+    echo "  $0 --deploy     # 执行完整部署"
+    echo
+}
+
+# 安装检查功能（从 check_install.sh 移植）
+run_installation_check() {
+    local issues_found=0
+
+    echo -e "${BLUE}"
+    echo "=============================================="
+    echo "    RFC Auto Grabber - 安装检查"
     echo "=============================================="
     echo -e "${NC}"
 
-    # 初始化日志
-    echo "部署开始: $(date)" > "$LOG_FILE"
-
-    # 执行部署步骤
-    check_root
-    check_system
-    clone_or_update_repo
-    collect_user_input
-    generate_config_file
-    install_system_dependencies
-    install_browser
-    create_virtual_environment
-    install_python_dependencies
-    run_tests
-    create_startup_scripts
-    show_completion_info
-
-    echo
-    print_step "是否立即启动抢购程序？"
-    read -p "(y/n): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        start_application
+    # 检查操作系统
+    print_step "检查操作系统..."
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        if [[ -f /etc/debian_version ]]; then
+            OS_VERSION=$(cat /etc/debian_version)
+            print_success "Debian/Ubuntu 系统 (版本: $OS_VERSION)"
+        elif [[ -f /etc/redhat-release ]]; then
+            OS_VERSION=$(cat /etc/redhat-release)
+            print_success "RedHat/CentOS 系统 (版本: $OS_VERSION)"
+        else
+            print_success "Linux 系统"
+        fi
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
+        print_success "Windows 系统 (Git Bash/Cygwin)"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        print_success "macOS 系统"
     else
-        print_info "您可以稍后使用以下命令启动："
-        print_info "$PROJECT_DIR/start_grabber.sh"
+        print_error "不支持的操作系统: $OSTYPE"
+        ((issues_found++))
     fi
 
-    log "部署完成: $(date)"
+    # 检查Python
+    print_step "检查Python环境..."
+    if command -v python3 >/dev/null 2>&1; then
+        PYTHON_VERSION=$(python3 --version)
+        print_success "$PYTHON_VERSION"
+    elif command -v python >/dev/null 2>&1; then
+        PYTHON_VERSION=$(python --version)
+        print_success "$PYTHON_VERSION"
+    else
+        print_error "Python 未安装"
+        ((issues_found++))
+    fi
+
+    # 检查pip
+    if command -v pip3 >/dev/null 2>&1; then
+        PIP_VERSION=$(pip3 --version | cut -d' ' -f2)
+        print_success "pip $PIP_VERSION"
+    elif command -v pip >/dev/null 2>&1; then
+        PIP_VERSION=$(pip --version | cut -d' ' -f2)
+        print_success "pip $PIP_VERSION"
+    else
+        print_error "pip 未安装"
+        ((issues_found++))
+    fi
+
+    # 检查虚拟环境
+    print_step "检查Python虚拟环境..."
+    if [[ -d "$VENV_DIR" ]]; then
+        print_success "虚拟环境已创建"
+
+        # 检查虚拟环境中的包
+        local activate_script
+        if [[ "$OS" == "windows" ]]; then
+            activate_script="$VENV_DIR/Scripts/activate"
+        else
+            activate_script="$VENV_DIR/bin/activate"
+        fi
+
+        if [[ -f "$activate_script" ]]; then
+            source "$activate_script"
+
+            # 检查关键包
+            packages=("DrissionPage" "dotenv" "selenium")
+            for package in "${packages[@]}"; do
+                if python -c "import $package" 2>/dev/null; then
+                    print_success "$package 已安装"
+                else
+                    print_error "$package 未安装"
+                    ((issues_found++))
+                fi
+            done
+
+            deactivate 2>/dev/null || true
+        else
+            print_error "虚拟环境损坏"
+            ((issues_found++))
+        fi
+    else
+        print_error "虚拟环境未创建"
+        ((issues_found++))
+    fi
+
+    # 检查Google Chrome
+    print_step "检查浏览器..."
+    if command -v google-chrome >/dev/null 2>&1; then
+        CHROME_VERSION=$(google-chrome --version)
+        print_success "$CHROME_VERSION"
+    elif command -v chromium-browser >/dev/null 2>&1; then
+        CHROME_VERSION=$(chromium-browser --version)
+        print_success "$CHROME_VERSION"
+    elif command -v chromium >/dev/null 2>&1; then
+        CHROME_VERSION=$(chromium --version)
+        print_success "$CHROME_VERSION"
+    else
+        print_error "Chrome/Chromium 未安装"
+        ((issues_found++))
+    fi
+
+    # 检查系统依赖
+    print_step "检查系统依赖..."
+    if [[ "$OS" != "windows" ]]; then
+        dependencies=("wget" "curl" "unzip")
+        for dep in "${dependencies[@]}"; do
+            if command -v "$dep" >/dev/null 2>&1; then
+                print_success "$dep 已安装"
+            else
+                print_error "$dep 未安装"
+                ((issues_found++))
+            fi
+        done
+
+        # 检查xvfb（Linux特有）
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            if command -v xvfb >/dev/null 2>&1; then
+                print_success "xvfb 已安装"
+            else
+                print_error "xvfb 未安装"
+                ((issues_found++))
+            fi
+        fi
+    else
+        print_info "Windows环境，跳过系统依赖检查"
+    fi
+
+    # 检查配置文件
+    print_step "检查配置文件..."
+    local env_file="$REPO_DIR/.env"
+    if [[ -f "$env_file" ]]; then
+        print_success ".env 配置文件存在"
+
+        # 检查关键配置项
+        source "$env_file" 2>/dev/null || true
+
+        if [[ -n "$EMAIL" && "$EMAIL" != "your_email@example.com" ]]; then
+            print_success "EMAIL 已配置"
+        else
+            print_warning "EMAIL 未配置或使用默认值"
+        fi
+
+        if [[ -n "$PASSWORD" && "$PASSWORD" != "your_password" ]]; then
+            print_success "PASSWORD 已配置"
+        else
+            print_warning "PASSWORD 未配置或使用默认值"
+        fi
+
+        if [[ -n "$PRODUCT_URL" ]]; then
+            print_success "PRODUCT_URL 已配置"
+        else
+            print_warning "PRODUCT_URL 未配置"
+        fi
+
+    elif [[ -f "$REPO_DIR/.env.example" ]]; then
+        print_warning ".env 文件不存在，但有示例文件"
+        print_info "请运行: cp .env.example .env"
+    else
+        print_error "配置文件不存在"
+        ((issues_found++))
+    fi
+
+    # 检查网络连接
+    print_step "检查网络连接..."
+    if ping -c 1 google.com >/dev/null 2>&1; then
+        print_success "网络连接正常"
+    else
+        print_warning "网络连接可能有问题"
+    fi
+
+    # 检查磁盘空间
+    print_step "检查磁盘空间..."
+    if command -v df >/dev/null 2>&1; then
+        AVAILABLE_SPACE=$(df "$PROJECT_DIR" 2>/dev/null | awk 'NR==2 {print $4}' || echo "0")
+        if [[ $AVAILABLE_SPACE -gt 1048576 ]]; then  # 1GB
+            print_success "磁盘空间充足 ($(($AVAILABLE_SPACE/1024/1024))GB 可用)"
+        else
+            print_warning "磁盘空间不足 ($(($AVAILABLE_SPACE/1024))MB 可用)"
+        fi
+    else
+        print_info "无法检查磁盘空间"
+    fi
+
+    # 检查内存
+    print_step "检查系统内存..."
+    if command -v free >/dev/null 2>&1; then
+        TOTAL_MEM=$(free -m | awk 'NR==2{print $2}')
+        AVAILABLE_MEM=$(free -m | awk 'NR==2{print $7}')
+
+        if [[ $TOTAL_MEM -gt 4096 ]]; then
+            print_success "系统内存充足 (${TOTAL_MEM}MB 总计)"
+        else
+            print_warning "系统内存较少 (${TOTAL_MEM}MB 总计)"
+        fi
+
+        if [[ $AVAILABLE_MEM -gt 2048 ]]; then
+            print_success "可用内存充足 (${AVAILABLE_MEM}MB 可用)"
+        else
+            print_warning "可用内存不足 (${AVAILABLE_MEM}MB 可用)"
+        fi
+    else
+        print_info "无法检查内存信息"
+    fi
+
+    # 总结
+    echo
+    echo "=============================================="
+    if [[ $issues_found -eq 0 ]]; then
+        print_success "🎉 所有检查通过！系统已准备就绪"
+        echo
+        print_info "下一步操作："
+        echo "  1. 配置 .env 文件 (如果还未配置)"
+        echo "  2. 运行测试: cd $REPO_DIR && python quick_start.py"
+        echo "  3. 启动服务: $PROJECT_DIR/start_grabber.sh"
+    else
+        print_error "发现 $issues_found 个问题需要解决"
+        echo
+        print_info "建议操作："
+        echo "  1. 重新运行部署脚本: $0 --deploy"
+        echo "  2. 手动安装缺失的依赖"
+        echo "  3. 检查配置文件"
+    fi
+    echo "=============================================="
+
+    return $issues_found
+}
+
+# 主函数
+main() {
+    # 解析命令行参数
+    parse_arguments "$@"
+
+    case $SCRIPT_MODE in
+        "help")
+            show_help
+            exit 0
+            ;;
+        "check")
+            clear
+            run_installation_check
+            exit $?
+            ;;
+        "deploy")
+            clear
+            echo -e "${CYAN}"
+            echo "=============================================="
+            echo "    RFC Auto Grabber - 智能部署脚本"
+            echo "    支持从GitHub自动拉取并配置启动"
+            echo "=============================================="
+            echo -e "${NC}"
+
+            # 初始化日志
+            echo "部署开始: $(date)" > "$LOG_FILE"
+
+            # 执行部署步骤
+            check_root
+            check_system
+            clone_or_update_repo
+            collect_user_input
+            generate_config_file
+            install_system_dependencies
+            install_browser
+            create_virtual_environment
+            install_python_dependencies
+            run_tests
+            create_startup_scripts
+            show_completion_info
+
+            echo
+            print_step "是否立即启动抢购程序？"
+            read -p "(y/n): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                start_application
+            else
+                print_info "您可以稍后使用以下命令启动："
+                print_info "$PROJECT_DIR/start_grabber.sh"
+            fi
+
+            log "部署完成: $(date)"
+            ;;
+        *)
+            print_error "未知模式: $SCRIPT_MODE"
+            show_help
+            exit 1
+            ;;
+    esac
 }
 
 # 错误处理
