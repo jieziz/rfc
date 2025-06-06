@@ -74,8 +74,7 @@ log() {
 check_root() {
     if [[ $EUID -eq 0 ]]; then
         print_warning "检测到root用户，建议使用普通用户运行此脚本"
-        read -p "是否继续？(y/N): " -n 1 -r
-        echo
+        read -p "是否继续？(y/N): " -r
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             exit 1
         fi
@@ -260,8 +259,7 @@ collect_user_input() {
     echo "商品PID: $PRODUCT_PID"
     echo
 
-    read -p "确认信息正确？(y/n): " -n 1 -r
-    echo
+    read -p "确认信息正确？(y/n): " -r
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         print_warning "重新输入配置信息..."
         collect_user_input
@@ -290,8 +288,7 @@ generate_config_file() {
         print_info "检测到Linux服务器环境，自动启用无头模式"
     elif [[ "$OSTYPE" == "linux-gnu"* ]] && [[ -n "$DISPLAY" ]]; then
         print_info "检测到Linux桌面环境，可选择是否使用无头模式"
-        read -p "是否使用无头模式？(推荐) (Y/n): " -n 1 -r
-        echo
+        read -p "是否使用无头模式？(推荐) (Y/n): " -r
         if [[ $REPLY =~ ^[Nn]$ ]]; then
             headless_mode="False"
         fi
@@ -664,8 +661,7 @@ install_browser() {
         echo "4. 仅卸载，不重新安装"
         echo
 
-        read -p "请选择操作 (1-4): " -n 1 -r
-        echo
+        read -p "请选择操作 (1-4): " -r
 
         case $REPLY in
             1)
@@ -706,8 +702,7 @@ install_browser() {
         echo "3. 跳过安装（使用无头模式）"
         echo
 
-        read -p "请选择安装选项 (1-3): " -n 1 -r
-        echo
+        read -p "请选择安装选项 (1-3): " -r
 
         case $REPLY in
             1)
@@ -773,8 +768,7 @@ create_virtual_environment() {
 
     if [[ -d "$VENV_DIR" ]]; then
         print_warning "虚拟环境已存在，是否重新创建？"
-        read -p "(y/N): " -n 1 -r
-        echo
+        read -p "(y/N): " -r
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             rm -rf "$VENV_DIR"
         else
@@ -934,8 +928,7 @@ start_application() {
     echo "4. 退出"
     echo
 
-    read -p "请选择启动方式 (1-4): " -n 1 -r
-    echo
+    read -p "请选择启动方式 (1-4): " -r
 
     case $REPLY in
         1)
@@ -1464,8 +1457,7 @@ main() {
 
             echo
             print_step "是否立即启动抢购程序？"
-            read -p "(y/n): " -n 1 -r
-            echo
+            read -p "(y/n): " -r
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 start_application
             else
