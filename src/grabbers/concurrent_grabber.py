@@ -35,6 +35,11 @@ def apply_headless_config(co, config: Dict[str, Any]):
         # 启用无头模式
         co.headless()
 
+        # 添加无头模式必要参数
+        co.set_argument('--disable-dev-shm-usage')
+        co.set_argument('--disable-gpu')
+        co.set_argument('--window-size=1920,1080')
+
         logging.info("已启用无头模式")
     else:
         logging.info("使用有头模式")
@@ -78,8 +83,7 @@ class ConcurrentConfig:
             'EMAIL': os.getenv("EMAIL"),
             'PASSWORD': os.getenv("PASSWORD"),
             'HEADLESS_MODE': os.getenv("HEADLESS_MODE", "True").lower() == "true",
-            'CUSTOM_USER_AGENT': os.getenv("CUSTOM_USER_AGENT", ""),
-
+            
             # 并发配置
             'CONCURRENT_BROWSERS': int(os.getenv("CONCURRENT_BROWSERS", "5")),
             'MAX_WORKERS': int(os.getenv("MAX_WORKERS", "10")),
