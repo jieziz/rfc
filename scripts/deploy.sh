@@ -510,18 +510,45 @@ install_google_chrome() {
     if [[ "$OS" == "debian" ]]; then
         print_info "下载并安装 Google Chrome (Debian/Ubuntu)..."
 
-        # 添加Google Chrome仓库
-        if ! grep -q "dl.google.com" /etc/apt/sources.list.d/google-chrome.list 2>/dev/null; then
-            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add - >/dev/null 2>&1
-            echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list >/dev/null
-            sudo apt-get update -qq
-        fi
+        # 创建临时目录
+        local temp_dir=$(mktemp -d)
+        local chrome_deb="$temp_dir/chrome.deb"
 
-        if sudo apt-get install -y google-chrome-stable >/dev/null 2>&1; then
-            print_success "Google Chrome 安装成功"
-            return 0
+        # 下载Chrome deb包
+        print_info "正在下载 Google Chrome deb 包..."
+        if wget -q "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" -O "$chrome_deb"; then
+            print_success "Chrome deb 包下载完成"
+
+            # 安装Chrome deb包
+            print_info "正在安装 Google Chrome..."
+            if sudo dpkg -i "$chrome_deb" >/dev/null 2>&1; then
+                print_success "Google Chrome 安装成功"
+                # 清理临时文件
+                rm -rf "$temp_dir"
+                return 0
+            else
+                print_warning "dpkg 安装失败，尝试修复依赖..."
+                # 修复可能的依赖问题
+                sudo apt-get install -f -y >/dev/null 2>&1
+                if command -v google-chrome >/dev/null 2>&1; then
+                    print_success "Google Chrome 安装成功（依赖已修复）"
+                    rm -rf "$temp_dir"
+                    return 0
+                else
+                    print_warning "Google Chrome 安装失败，尝试安装 Chromium..."
+                    rm -rf "$temp_dir"
+                    if sudo apt-get install -y chromium-browser >/dev/null 2>&1; then
+                        print_success "Chromium 安装成功"
+                        return 0
+                    else
+                        print_error "浏览器安装失败"
+                        return 1
+                    fi
+                fi
+            fi
         else
-            print_warning "Google Chrome 安装失败，尝试安装 Chromium..."
+            print_warning "Chrome deb 包下载失败，尝试安装 Chromium..."
+            rm -rf "$temp_dir"
             if sudo apt-get install -y chromium-browser >/dev/null 2>&1; then
                 print_success "Chromium 安装成功"
                 return 0
@@ -534,23 +561,39 @@ install_google_chrome() {
     elif [[ "$OS" == "redhat" ]]; then
         print_info "下载并安装 Google Chrome (RedHat/CentOS)..."
 
-        # 创建Google Chrome仓库文件
-        if [[ ! -f /etc/yum.repos.d/google-chrome.repo ]]; then
-            sudo tee /etc/yum.repos.d/google-chrome.repo >/dev/null << EOF
-[google-chrome]
-name=google-chrome
-baseurl=http://dl.google.com/linux/chrome/rpm/stable/x86_64
-enabled=1
-gpgcheck=1
-gpgkey=https://dl.google.com/linux/linux_signing_key.pub
-EOF
-        fi
+        # 创建临时目录
+        local temp_dir=$(mktemp -d)
+        local chrome_rpm="$temp_dir/chrome.rpm"
 
-        if sudo yum install -y google-chrome-stable >/dev/null 2>&1; then
-            print_success "Google Chrome 安装成功"
-            return 0
+        # 下载Chrome rpm包
+        print_info "正在下载 Google Chrome rpm 包..."
+        if wget -q "https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm" -O "$chrome_rpm"; then
+            print_success "Chrome rpm 包下载完成"
+
+            # 安装Chrome rpm包
+            print_info "正在安装 Google Chrome..."
+            if sudo rpm -i "$chrome_rpm" >/dev/null 2>&1; then
+                print_success "Google Chrome 安装成功"
+                rm -rf "$temp_dir"
+                return 0
+            elif sudo yum localinstall -y "$chrome_rpm" >/dev/null 2>&1; then
+                print_success "Google Chrome 安装成功（使用yum）"
+                rm -rf "$temp_dir"
+                return 0
+            else
+                print_warning "Google Chrome 安装失败，尝试安装 Chromium..."
+                rm -rf "$temp_dir"
+                if sudo yum install -y chromium >/dev/null 2>&1; then
+                    print_success "Chromium 安装成功"
+                    return 0
+                else
+                    print_error "浏览器安装失败"
+                    return 1
+                fi
+            fi
         else
-            print_warning "Google Chrome 安装失败，尝试安装 Chromium..."
+            print_warning "Chrome rpm 包下载失败，尝试安装 Chromium..."
+            rm -rf "$temp_dir"
             if sudo yum install -y chromium >/dev/null 2>&1; then
                 print_success "Chromium 安装成功"
                 return 0

@@ -9,11 +9,95 @@ import time
 import subprocess
 try:
     from src.core.performance_config import PerformanceConfig, create_optimized_env_file
-    from src.utils.linux_optimizer import log_environment_info, is_linux_headless_environment
 except ImportError as e:
     print(f"导入错误: {e}")
     print("请确保所有文件都在正确的目录中")
     sys.exit(1)
+
+def is_linux_headless_environment() -> bool:
+    """检测是否为Linux无头环境"""
+    return (
+        os.name == 'posix' and
+        not os.environ.get('DISPLAY') and
+        not os.environ.get('WAYLAND_DISPLAY')
+    )
+
+def log_environment_info():
+    """记录环境信息到日志"""
+    print("🔍 检测系统环境...")
+
+    if os.name == 'posix':
+        print("✅ Linux/Unix 系统")
+        display = os.environ.get('DISPLAY')
+        wayland = os.environ.get('WAYLAND_DISPLAY')
+
+        if is_linux_headless_environment():
+            print("🖥️  无头环境 (无显示服务器)")
+        else:
+            print(f"🖥️  图形环境 - DISPLAY: {display or 'None'}, Wayland: {wayland or 'None'}")
+    elif os.name == 'nt':
+        print("✅ Windows 系统")
+    else:
+        print(f"✅ 其他系统: {os.name}")
+
+def ask_headless_mode() -> bool:
+    """询问用户是否启用无头模式"""
+    if os.name != 'posix':  # 非Linux系统
+        return False
+
+    if is_linux_headless_environment():
+        print("🐧 检测到Linux服务器环境（无显示），建议启用无头模式")
+        while True:
+            choice = input("是否启用无头模式？(Y/n): ").strip().lower()
+            if choice in ['', 'y', 'yes']:
+                return True
+            elif choice in ['n', 'no']:
+                return False
+            else:
+                print("请输入 y 或 n")
+    else:
+        print("🐧 检测到Linux桌面环境")
+        while True:
+            choice = input("是否启用无头模式？(y/N): ").strip().lower()
+            if choice in ['y', 'yes']:
+                return True
+            elif choice in ['', 'n', 'no']:
+                return False
+            else:
+                print("请输入 y 或 n")
+
+def update_headless_config(enable_headless: bool):
+    """更新.env文件中的无头模式配置"""
+    env_file = '.env'
+
+    if not os.path.exists(env_file):
+        print("❌ .env 文件不存在，无法更新无头模式配置")
+        return
+
+    # 读取现有配置
+    with open(env_file, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+
+    # 更新HEADLESS_MODE配置
+    headless_value = 'True' if enable_headless else 'False'
+    updated = False
+
+    for i, line in enumerate(lines):
+        if line.strip().startswith('HEADLESS_MODE='):
+            lines[i] = f'HEADLESS_MODE={headless_value}\n'
+            updated = True
+            break
+
+    # 如果没有找到HEADLESS_MODE配置，添加它
+    if not updated:
+        lines.append(f'HEADLESS_MODE={headless_value}\n')
+
+    # 写回文件
+    with open(env_file, 'w', encoding='utf-8') as f:
+        f.writelines(lines)
+
+    mode_text = "启用" if enable_headless else "禁用"
+    print(f"✅ 已{mode_text}无头模式配置")
 
 def print_banner():
     """打印横幅"""
@@ -27,6 +111,7 @@ def print_banner():
 ║  ✅ 智能性能配置                                             ║
 ║  ✅ 自动故障恢复                                             ║
 ║  ✅ 实时监控                                                 ║
+║  ✅ 无头模式支持                                             ║
 ╚══════════════════════════════════════════════════════════════╝
     """
     print(banner)
@@ -166,17 +251,20 @@ def main():
     print_banner()
 
     # 检测并记录环境信息
-    print("🔍 检测系统环境...")
     log_environment_info()
-
-    # Linux无头环境提示
-    if is_linux_headless_environment():
-        print("🐧 检测到Linux服务器环境（无显示），已自动启用无头模式优化")
 
     # 检查配置
     if not check_config():
         print("\n请先配置 .env 文件后再运行。")
         return
+
+    # 询问无头模式设置
+    print("\n" + "="*60)
+    print("🖥️  浏览器显示模式配置")
+    print("="*60)
+    enable_headless = ask_headless_mode()
+    update_headless_config(enable_headless)
+    print("="*60)
     
     while True:
         modes = show_modes()

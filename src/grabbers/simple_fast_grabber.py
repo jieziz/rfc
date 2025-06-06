@@ -10,10 +10,37 @@ from DrissionPage import ChromiumPage, ChromiumOptions
 from dotenv import load_dotenv
 import os
 from ..utils.TimePinner import Pinner
-from ..utils.linux_optimizer import apply_linux_optimizations
 
 from typing import Dict, Any
 import random
+
+def apply_headless_config(co, config: Dict[str, Any]):
+    """应用无头模式配置"""
+    headless_value = config.get('HEADLESS_MODE', False)
+
+    # 处理不同类型的值
+    if isinstance(headless_value, bool):
+        headless_mode = headless_value
+    elif isinstance(headless_value, str):
+        headless_mode = headless_value.lower() in ['true', '1', 'yes', 'on']
+    else:
+        headless_mode = bool(headless_value)
+
+    if headless_mode:
+        # 启用无头模式
+        co.headless()
+
+        # 添加无头模式必要参数
+        co.set_argument('--no-sandbox')
+        co.set_argument('--disable-dev-shm-usage')
+        co.set_argument('--disable-gpu')
+        co.set_argument('--window-size=1920,1080')
+
+        logging.info("已启用无头模式")
+    else:
+        logging.info("使用有头模式")
+
+    return co
 
 # 配置日志
 logging.basicConfig(
@@ -77,8 +104,8 @@ def create_fast_browser(config: Dict[str, Any]):
     for arg in performance_args:
         co.set_argument(arg)
 
-    # 应用Linux环境优化
-    co = apply_linux_optimizations(co, 'performance')
+    # 应用无头模式配置
+    co = apply_headless_config(co, config)
 
     # 设置浏览器首选项
     co.set_pref('credentials_enable_service', False)
