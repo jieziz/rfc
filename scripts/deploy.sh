@@ -294,6 +294,86 @@ generate_config_file() {
         fi
     fi
 
+    # 自动选择User-Agent
+    local user_agent=""
+    print_step "配置浏览器User-Agent..."
+
+    # 根据操作系统自动选择合适的User-Agent
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        print_info "检测到Linux系统，自动选择Linux Chrome User-Agent"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        print_info "检测到macOS系统，自动选择macOS Chrome User-Agent"
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        print_info "检测到Windows系统，自动选择Windows Chrome User-Agent"
+    else
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        print_info "未知系统，使用默认Windows Chrome User-Agent"
+    fi
+
+    echo
+    print_info "当前选择的User-Agent:"
+    echo "  $user_agent"
+    echo
+    print_step "User-Agent选项："
+    echo "1. 使用自动选择的User-Agent（推荐）"
+    echo "2. 选择其他预设User-Agent"
+    echo "3. 自定义User-Agent"
+    echo
+
+    read -p "请选择User-Agent配置 (1-3): " -r
+
+    case $REPLY in
+        2)
+            print_step "预设User-Agent选项："
+            echo "1. Windows Chrome: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            echo "2. macOS Chrome: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            echo "3. Linux Chrome: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            echo "4. Edge: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
+            echo
+
+            read -p "请选择预设User-Agent (1-4): " -r
+
+            case $REPLY in
+                1)
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    print_info "已选择Windows Chrome User-Agent"
+                    ;;
+                2)
+                    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    print_info "已选择macOS Chrome User-Agent"
+                    ;;
+                3)
+                    user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    print_info "已选择Linux Chrome User-Agent"
+                    ;;
+                4)
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
+                    print_info "已选择Edge User-Agent"
+                    ;;
+                *)
+                    print_warning "无效选择，使用自动选择的User-Agent"
+                    ;;
+            esac
+            ;;
+        3)
+            echo
+            print_info "请输入自定义User-Agent:"
+            read -p "User-Agent: " custom_user_agent
+            if [[ -n "$custom_user_agent" ]]; then
+                user_agent="$custom_user_agent"
+                print_info "已设置自定义User-Agent"
+            else
+                print_warning "输入为空，使用自动选择的User-Agent"
+            fi
+            ;;
+        *)
+            print_info "使用自动选择的User-Agent"
+            ;;
+    esac
+
     # 生成.env文件
     cat > "$env_file" << EOF
 # 基础配置
@@ -315,6 +395,9 @@ CONCURRENT_BROWSERS=3
 FAST_MODE=True
 QUICK_PURCHASE=True
 
+# 浏览器配置
+CUSTOM_USER_AGENT=$user_agent
+
 # 可选配置
 PROMO_CODE=
 TG_BOT_TOKEN=
@@ -323,7 +406,8 @@ EOF
 
     print_success "配置文件生成完成: $env_file"
     print_info "无头模式设置: $headless_mode"
-    log "配置文件生成完成，无头模式: $headless_mode"
+    print_info "User-Agent设置: ${user_agent:0:50}..."
+    log "配置文件生成完成，无头模式: $headless_mode，User-Agent: $user_agent"
 }
 
 # 安装系统依赖（根据操作系统）
@@ -1096,6 +1180,8 @@ show_completion_info() {
     echo "  - 邮箱: $USER_EMAIL"
     echo "  - 商品PID: $PRODUCT_PID"
     echo "  - 产品URL: https://my.rfchost.com/cart.php?a=add&pid=$PRODUCT_PID"
+    echo "  - 无头模式: $headless_mode"
+    echo "  - User-Agent: ${user_agent:0:60}..."
     echo
     print_warning "⚠️  重要提醒："
     echo "  - 配置已自动生成，如需修改请编辑 $REPO_DIR/.env"
