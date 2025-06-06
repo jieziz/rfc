@@ -1,14 +1,16 @@
-# 🚀 WHCMS Auto Grabber - Linux 安装指南
+# 🚀 RFC Auto Grabber - 多平台安装指南
 
 ## 📦 快速安装 (推荐)
 
-### 一键部署
+### 一键部署 (支持Windows Git Bash、Linux、macOS)
 ```bash
-# 给脚本执行权限
-chmod +x quick_deploy.sh
+# 克隆项目
+git clone https://github.com/your-repo/rfc.git
+cd rfc
 
-# 运行快速部署
-./quick_deploy.sh
+# 给脚本执行权限并运行
+chmod +x deploy.sh
+./deploy.sh
 ```
 
 ### 配置和启动
@@ -28,29 +30,24 @@ nano .env  # 编辑配置文件
 ## 📋 详细步骤
 
 ### 1. 系统要求
-- **操作系统**: Debian 10+ / Ubuntu 18.04+
+- **操作系统**: Windows 10+ (Git Bash) / Linux (Ubuntu 18.04+/Debian 10+) / macOS 10.14+
 - **内存**: 4GB+ (推荐8GB)
 - **存储**: 2GB+ 可用空间
 - **网络**: 稳定的互联网连接
+- **软件**: Git, Python 3.8+, Chrome/Chromium浏览器
 
 ### 2. 部署选项
 
-#### 选项A: 完整部署 (新手推荐)
+#### 智能部署 (推荐)
 ```bash
 chmod +x deploy.sh
 ./deploy.sh
 ```
-- ✅ 完整的系统检查
-- ✅ 自动创建systemd服务
-- ✅ 详细的错误处理
-
-#### 选项B: 快速部署 (经验用户)
-```bash
-chmod +x quick_deploy.sh
-./quick_deploy.sh
-```
-- ⚡ 5分钟快速安装
-- 🎯 专注核心功能
+- ✅ 自动检测操作系统 (Windows/Linux/macOS)
+- ✅ 智能安装系统依赖
+- ✅ 交互式配置向导
+- ✅ 完整的错误处理
+- ✅ 跨平台兼容性
 
 ### 3. 配置文件
 
@@ -174,16 +171,15 @@ sudo reboot
 ## 📁 文件结构
 
 ```
-whcms-auto/rfc/
-├── deploy.sh              # 完整部署脚本
-├── quick_deploy.sh         # 快速部署脚本
+rfc/
+├── deploy.sh               # 智能多平台部署脚本
 ├── check_install.sh        # 安装检查脚本
-├── run.sh                  # 交互式启动脚本
-├── daemon.sh               # 后台服务脚本
+├── quick_start.py          # 快速启动脚本
 ├── .env.example            # 配置文件示例
 ├── requirements.txt        # Python依赖
-├── README_Linux部署指南.md  # 详细部署指南
-└── INSTALL.md             # 本文件
+├── README.md               # 项目说明
+├── README_CN.md            # 中文说明
+└── INSTALL.md              # 本文件
 ```
 
 ## 🎯 使用建议

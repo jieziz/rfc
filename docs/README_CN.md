@@ -15,18 +15,22 @@
 
 ## 🚀 快速上手
 
-### Windows 用户（推荐）
+### 一键部署（支持Windows、Linux、macOS）
 
-1. **安装Git Bash**
-   - 下载：https://git-scm.com/download/win
-   - 安装时选择默认选项
+1. **安装必要工具**
+   - **Windows**: 安装Git Bash (https://git-scm.com/download/win)
+   - **Linux**: 确保已安装git、python3、pip3
+   - **macOS**: 确保已安装git、python3
 
 2. **运行部署脚本**
    ```bash
-   # 下载并运行部署脚本
-   curl -O https://raw.githubusercontent.com/your-repo/rfc/main/deploy_gitbash.sh
-   chmod +x deploy_gitbash.sh
-   ./deploy_gitbash.sh
+   # 克隆项目
+   git clone https://github.com/your-repo/rfc.git
+   cd rfc
+
+   # 运行智能部署脚本
+   chmod +x deploy.sh
+   ./deploy.sh
    ```
 
 3. **按提示配置**
@@ -37,22 +41,17 @@
 
 4. **选择模式开始抢购**
 
-### Linux 用户
+### 手动配置
 
 ```bash
-# 1. 克隆项目
-git clone https://github.com/your-repo/rfc.git
-cd rfc
+# 1. 安装依赖
+pip install -r requirements.txt
 
-# 2. 运行部署脚本
-chmod +x deploy.sh
-./deploy.sh
-
-# 3. 配置环境变量
+# 2. 配置环境变量
 cp .env.example .env
 nano .env  # 编辑配置文件
 
-# 4. 启动程序
+# 3. 启动程序
 python quick_start.py
 ```
 
@@ -201,14 +200,13 @@ chmod +x *.sh
 - `performance_config.py` - 性能配置管理
 
 ### 部署脚本
-- `deploy_gitbash.sh` - Windows自动部署
-- `deploy.sh` - Linux自动部署
+- `deploy.sh` - 智能多平台自动部署
 - `check_install.sh` - 安装检查
 
 ## 💡 使用建议
 
 ### 新手用户
-1. ✅ 使用Windows Git Bash部署脚本
+1. ✅ 使用智能部署脚本
 2. ✅ 选择"简化快速模式"
 3. ✅ 先测试运行确保配置正确
 4. ✅ 观察日志输出调整参数

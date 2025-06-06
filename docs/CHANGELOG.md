@@ -18,14 +18,14 @@
 ### 🎉 重大更新
 - **全新架构** - 重构核心抢购引擎，性能提升300%
 - **智能模式** - 新增简化快速模式，稳定性大幅提升
-- **一键部署** - 支持Windows Git Bash和Linux全自动部署
+- **智能部署** - 支持Windows Git Bash、Linux、macOS多平台自动部署
 
 ### ✨ 新增功能
 - 新增 `simple_fast_grabber.py` - 简化快速抢购模式
 - 新增 `TimePinner.py` - 高精度时间测量工具
 - 新增 `browser_pool.py` - 智能浏览器池管理
 - 新增 `performance_config.py` - 动态性能配置系统
-- 新增 `deploy_gitbash.sh` - Windows自动部署脚本
+- 改进 `deploy.sh` - 智能多平台部署脚本
 - 新增 `quick_start.py` - 交互式启动界面
 - 新增实时性能监控和统计功能
 - 新增自动故障检测和恢复机制

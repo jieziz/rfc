@@ -8,7 +8,7 @@ import sys
 import time
 import subprocess
 try:
-    from performance_config import PerformanceConfig, create_optimized_env_file
+    from src.core.performance_config import PerformanceConfig, create_optimized_env_file
 except ImportError as e:
     print(f"导入错误: {e}")
     print("请确保所有文件都在正确的目录中")
@@ -200,30 +200,30 @@ def main():
             # 根据选择运行相应脚本
             if choice == '1':  # simple_fast
                 optimize_config('fast')
-                run_script('simple_fast_grabber.py')
+                run_script('src/grabbers/simple_fast_grabber.py')
             elif choice == '2':  # fast
                 optimize_config('fast')
-                run_script('super_grabber.py', 'fast')
+                run_script('src/grabbers/super_grabber.py', 'fast')
             elif choice == '3':  # ultra_fast
                 optimize_config('ultra_fast')
-                run_script('super_grabber.py', 'ultra_fast')
+                run_script('src/grabbers/super_grabber.py', 'ultra_fast')
             elif choice == '4':  # balanced
                 optimize_config('balanced')
-                run_script('super_grabber.py', 'balanced')
+                run_script('src/grabbers/super_grabber.py', 'balanced')
             elif choice == '5':  # stable_new
                 optimize_config('stable')
-                run_script('stable_grabber.py')
+                run_script('src/grabbers/stable_grabber.py')
             elif choice == '6':  # stable
                 optimize_config('stable')
-                run_script('super_grabber.py', 'stable')
+                run_script('src/grabbers/super_grabber.py', 'stable')
             elif choice == '7':  # concurrent
                 optimize_config('fast')
-                run_script('concurrent_grabber.py')
+                run_script('src/grabbers/concurrent_grabber.py')
             elif choice == '8':  # debug
                 optimize_config('debug')
-                run_script('super_grabber.py', 'debug')
+                run_script('src/grabbers/super_grabber.py', 'debug')
             elif choice == '9':  # original
-                run_script('auto.py')
+                run_script('src/grabbers/auto.py')
             
             print("\n" + "="*60)
             
