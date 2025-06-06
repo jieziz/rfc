@@ -172,3 +172,26 @@ Thumbs.db
 # 部署相关
 deploy_temp/
 rfc_repo/
+
+# 构建相关
+build/
+dist/
+release/
+obfuscated/
+release_obfuscated/
+*.zip
+*.tar.gz
+
+# 测试文件
+test_*.py
+*_test.py
+verification_*.py
+optimization_*.py
+final_check.py
+verify_*.py
+OPTIMIZATION_*.md
+
+# 浏览器驱动
+chromedriver*
+geckodriver*
+msedgedriver*

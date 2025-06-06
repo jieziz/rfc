@@ -66,7 +66,7 @@ format:
 # 检查依赖
 check-deps:
 	@echo "📋 检查依赖..."
-	python scripts/check_install.sh
+	./scripts/deploy.sh --check
 
 # 构建包
 build:

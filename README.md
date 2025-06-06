@@ -4,13 +4,15 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](README.md)
 [![Status](https://img.shields.io/badge/status-Active-brightgreen.svg)](README.md)
-[![Version](https://img.shields.io/badge/version-2.0.0-orange.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.0.0-orange.svg)](README.md)
 
 一个高性能的RFC/WHCMS自动抢购脚本，支持多种抢购模式和智能优化策略。
 
 > 🎯 **专业级抢购工具** - 为RFC/WHCMS平台量身定制，支持极速抢购和智能优化
 >
 > 🔥 **一键部署** - 统一部署脚本，支持跨平台自动化安装
+>
+> 🛡️ **源码保护** - 支持二进制编译，完全保护核心算法
 
 ## ✨ 特性
 
@@ -26,7 +28,7 @@
 
 ## 🚀 快速开始
 
-### 🌟 一键安装 (超级推荐)
+### 🌟 方式一：一键安装 (用户推荐)
 
 **一条命令完成所有安装，无需克隆项目：**
 
@@ -35,15 +37,30 @@
 bash <(curl -Ls https://raw.githubusercontent.com/jieziz/rfc/main/install.sh)
 ```
 
-> 🎯 **超级简单**: 
+> 🎯 **超级简单**:
 > - 🚀 **零配置** - 一条命令搞定一切
 > - 🌐 **远程安装** - 无需手动下载项目
 > - 🔄 **自动检测** - 智能识别系统环境
 > - 📦 **完整部署** - 自动安装所有依赖
 
-### 传统部署方式
+### 🛡️ 方式二：二进制版本 (源码保护)
 
-如果您更喜欢传统方式：
+**适合需要保护源码的场景：**
+
+```bash
+# 二进制版本一键安装
+bash <(curl -Ls https://your-domain.com/install_binary.sh)
+```
+
+> 🔒 **源码保护特性**:
+> - 🛡️ **完全保护** - 用户无法查看Python源码
+> - 🚀 **无需环境** - 用户无需安装Python和依赖
+> - 📦 **开箱即用** - 下载即可使用
+> - 🌐 **跨平台** - 支持Windows/Linux/macOS
+
+### 🔧 方式三：开发者部署
+
+如果您是开发者或需要自定义：
 
 ```bash
 # 1. 克隆项目
@@ -62,37 +79,6 @@ chmod +x scripts/deploy.sh
 > - ✅ **Windows** (Git Bash/Cygwin)
 > - ✅ **Linux** (Ubuntu/Debian/CentOS/RHEL)
 > - ✅ **macOS** (Homebrew支持)
->
-> 部署脚本会自动检测系统环境并安装所需依赖
-
-### 手动配置 (可选)
-
-如果需要手动配置环境：
-
-```bash
-# 1. 安装Python依赖
-pip install -r config/requirements.txt
-
-# 2. 配置环境变量 (可选)
-cp config/.env.example .env
-nano .env  # 编辑配置文件
-
-# 3. 启动程序
-python quick_start.py
-```
-
-### 包管理器安装
-
-```bash
-# 使用pip安装
-pip install -e .
-
-# 安装开发依赖
-pip install -e .[dev]
-
-# 命令行启动
-rfc-grabber
-```
 
 ## 📋 抢购模式
 
@@ -142,60 +128,89 @@ rfc-grabber
 
 ```
 rfc/
-├── 📄 src/                     # 源代码 (分层架构)
-│   ├── core/                   # 核心模块
-│   │   ├── __init__.py         # 模块初始化
-│   │   ├── browser_pool.py     # 浏览器池管理
-│   │   └── performance_config.py # 性能配置
-│   ├── grabbers/               # 抢购脚本
-│   │   ├── __init__.py         # 模块初始化
-│   │   ├── simple_fast_grabber.py # 简化快速抢购 (推荐)
-│   │   ├── stable_grabber.py   # 稳定版抢购
-│   │   ├── concurrent_grabber.py # 并发抢购
-│   │   ├── auto.py             # 原版脚本 (兼容)
-│   │   ├── auto_optimized.py   # 优化版脚本 (兼容)
-│   │   └── super_grabber.py    # 超级抢购器 (多模式)
-│   └── utils/                  # 工具模块
-│       ├── __init__.py         # 模块初始化
-│       └── TimePinner.py       # 时间测量工具
-├── 🚀 scripts/                 # 部署脚本
-│   └── deploy.sh               # 统一多平台部署脚本
-├── 📚 docs/                    # 文档
-│   ├── README.md               # 详细说明
-│   ├── README_CN.md            # 中文说明
-│   ├── INSTALL.md              # 安装指南
-│   ├── CHANGELOG.md            # 更新日志
-│   └── CONTRIBUTING.md         # 贡献指南
-├── ⚙️ config/                  # 配置
-│   ├── requirements.txt        # Python依赖
-│   └── .env.example            # 配置模板
-├── 🧪 tests/                   # 测试套件
-│   └── __init__.py             # 测试模块初始化
-├── install.sh                  # 一键安装脚本
-├── quick_start.py              # 完整启动入口 (高级用户)
-├── start_simple.py             # 简化启动入口 (推荐新手)
-├── setup.py                    # 包安装配置
-├── Makefile                    # 构建脚本
-└── LICENSE                     # MIT许可证
+├── 📄 核心文件
+│   ├── quick_start.py              # 主启动器 (推荐入口)
+│   ├── install.sh                  # 一键安装脚本
+│   ├── install_binary.sh           # 二进制版本安装脚本
+│   └── README.md                   # 项目说明 (本文件)
+│
+├── 🐍 源代码
+│   └── src/                        # 源代码目录
+│       ├── core/                   # 核心模块 (浏览器池、性能配置)
+│       ├── grabbers/               # 抢购脚本 (快速、稳定、并发模式)
+│       └── utils/                  # 工具模块 (时间测量等)
+│
+├── 🔨 构建脚本
+│   └── scripts/
+│       ├── build_release.sh        # Linux/macOS构建脚本
+│       ├── build_release.bat       # Windows构建脚本
+│       └── deploy.sh               # 统一部署脚本
+│
+├── ⚙️ 配置
+│   ├── config/requirements.txt     # Python依赖
+│   ├── Makefile                    # 构建命令
+│   └── .gitignore                  # Git忽略规则
+│
+└── 📚 文档
+    ├── docs/                       # 详细文档
+    └── LICENSE                     # MIT许可证
 ```
+
+## 🛡️ 源码保护 (开发者专用)
+
+### 🔨 二进制编译构建
+
+如果您需要保护源码不被泄露，可以将项目编译为二进制文件：
+
+#### Windows 环境构建
+```batch
+# 进入项目目录
+cd C:\Users\vedeng\Desktop\rfc
+
+# 运行Windows构建脚本
+scripts\build_release.bat
+```
+
+#### Linux/macOS 环境构建
+```bash
+# 给脚本执行权限
+chmod +x scripts/build_release.sh
+
+# 运行构建脚本
+./scripts/build_release.sh
+```
+
+#### 构建产物
+构建完成后，`release/` 目录将包含：
+- `rfc-grabber.exe` - 主程序
+- `fast-grabber.exe` - 快速模式
+- `stable-grabber.exe` - 稳定模式
+- `concurrent-grabber.exe` - 并发模式
+- `.env.template` - 配置模板
+- `start.bat/start.sh` - 启动脚本
+
+#### 分发部署
+1. 上传构建包到GitHub Releases或您的服务器
+2. 修改 `install_binary.sh` 中的下载地址
+3. 提供一键安装命令给用户
+
+> 🔒 **保护效果**:
+> - ✅ 源码完全不可见
+> - ✅ 无法反编译查看Python代码
+> - ✅ 用户无需Python环境
+> - ✅ 保持一键安装体验
 
 ## 🎯 使用示例
 
-### 1. 简化启动器 (推荐新手)
-```bash
-python start_simple.py
-```
-> 💡 简化界面，只提供3个核心模式，更容易选择
-
-### 2. 完整启动器 (高级用户)
+### 1. 快速启动 (推荐)
 ```bash
 python quick_start.py
 ```
-> 💡 包含配置优化和详细选项
+> 💡 交互式界面，提供3个核心模式选择
 
-### 3. 直接启动特定模式
+### 2. 直接启动特定模式
 ```bash
-# 简化快速模式 (推荐)
+# 快速模式 (推荐)
 python src/grabbers/simple_fast_grabber.py
 
 # 稳定模式
@@ -203,15 +218,6 @@ python src/grabbers/stable_grabber.py
 
 # 并发模式
 python src/grabbers/concurrent_grabber.py
-```
-
-### 4. 原版脚本 (兼容性)
-```bash
-# 原始版本
-python src/grabbers/auto.py
-
-# 优化版本
-python src/grabbers/auto_optimized.py
 ```
 
 ## 🔍 故障排除
@@ -247,7 +253,7 @@ python src/grabbers/auto_optimized.py
 ### v2.0.0 主要更新
 - ✅ **一键安装** - 新增远程一条命令安装功能
 - ✅ **简化模式选择** - 从9个模式精简为3个核心模式
-- ✅ **双启动器设计** - 新手友好的简化版 + 高级用户完整版
+- ✅ **统一启动器** - 单一入口点，交互式模式选择
 - ✅ **统一部署脚本** - 整合多平台部署功能，简化安装流程
 - ✅ **模块化架构** - 重构代码结构，提高可维护性
 - ✅ **包管理器支持** - 支持pip安装和命令行启动

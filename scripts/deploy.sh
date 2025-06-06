@@ -630,8 +630,8 @@ start_application() {
     echo
     print_info "启动选项："
     echo "1. 快速启动（推荐）- 使用 quick_start.py"
-    echo "2. 简化快速模式 - 使用 simple_fast_grabber.py"
-    echo "3. 原版模式 - 使用 auto.py"
+    echo "2. 快速模式 - 使用 simple_fast_grabber.py"
+    echo "3. 稳定模式 - 使用 stable_grabber.py"
     echo "4. 退出"
     echo
 
@@ -649,17 +649,22 @@ start_application() {
             fi
             ;;
         2)
-            print_info "启动简化快速模式..."
-            if [[ -f "simple_fast_grabber.py" ]]; then
-                python simple_fast_grabber.py
+            print_info "启动快速模式..."
+            if [[ -f "src/grabbers/simple_fast_grabber.py" ]]; then
+                python src/grabbers/simple_fast_grabber.py
             else
-                print_error "simple_fast_grabber.py 不存在，使用备用方案"
-                python auto.py
+                print_error "simple_fast_grabber.py 不存在"
+                return 1
             fi
             ;;
         3)
-            print_info "启动原版模式..."
-            python auto.py
+            print_info "启动稳定模式..."
+            if [[ -f "src/grabbers/stable_grabber.py" ]]; then
+                python src/grabbers/stable_grabber.py
+            else
+                print_error "stable_grabber.py 不存在"
+                return 1
+            fi
             ;;
         4)
             print_info "退出程序"
@@ -667,7 +672,7 @@ start_application() {
             ;;
         *)
             print_warning "无效选择，使用默认启动方式"
-            python auto.py
+            python quick_start.py
             ;;
     esac
 
@@ -754,7 +759,8 @@ fi
 if [[ -f "quick_start.py" ]]; then
     \$PYTHON_CMD quick_start.py
 else
-    \$PYTHON_CMD auto.py
+    print_error "quick_start.py 不存在"
+    exit 1
 fi
 
 # 清理
@@ -791,8 +797,8 @@ show_completion_info() {
     echo
     echo "  3. 手动启动特定模式:"
     echo "     cd $REPO_DIR && source $VENV_DIR/bin/activate"
-    echo "     python simple_fast_grabber.py  # 简化快速模式"
-    echo "     python auto.py                 # 原版模式"
+    echo "     python src/grabbers/simple_fast_grabber.py  # 快速模式"
+    echo "     python src/grabbers/stable_grabber.py       # 稳定模式"
     echo
     print_info "配置信息："
     echo "  - 邮箱: $USER_EMAIL"
