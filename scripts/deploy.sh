@@ -425,32 +425,283 @@ install_macos_dependencies() {
     fi
 }
 
+# 卸载Chrome/Chromium浏览器
+uninstall_chrome() {
+    print_step "卸载现有Chrome/Chromium浏览器..."
+
+    local uninstalled=false
+
+    # 卸载Google Chrome
+    if command -v google-chrome >/dev/null 2>&1; then
+        print_info "卸载 Google Chrome..."
+        if [[ "$OS" == "debian" ]]; then
+            if sudo apt-get remove --purge -y google-chrome-stable >/dev/null 2>&1; then
+                print_success "Google Chrome 卸载成功"
+                uninstalled=true
+            else
+                print_warning "Google Chrome 卸载失败"
+            fi
+        elif [[ "$OS" == "redhat" ]]; then
+            if sudo yum remove -y google-chrome-stable >/dev/null 2>&1; then
+                print_success "Google Chrome 卸载成功"
+                uninstalled=true
+            else
+                print_warning "Google Chrome 卸载失败"
+            fi
+        elif [[ "$OS" == "macos" ]]; then
+            if [[ -d "/Applications/Google Chrome.app" ]]; then
+                sudo rm -rf "/Applications/Google Chrome.app"
+                print_success "Google Chrome 卸载成功"
+                uninstalled=true
+            fi
+        fi
+    fi
+
+    # 卸载Chromium
+    if command -v chromium-browser >/dev/null 2>&1 || command -v chromium >/dev/null 2>&1; then
+        print_info "卸载 Chromium..."
+        if [[ "$OS" == "debian" ]]; then
+            if sudo apt-get remove --purge -y chromium-browser >/dev/null 2>&1; then
+                print_success "Chromium 卸载成功"
+                uninstalled=true
+            else
+                print_warning "Chromium 卸载失败"
+            fi
+        elif [[ "$OS" == "redhat" ]]; then
+            if sudo yum remove -y chromium >/dev/null 2>&1; then
+                print_success "Chromium 卸载成功"
+                uninstalled=true
+            else
+                print_warning "Chromium 卸载失败"
+            fi
+        elif [[ "$OS" == "macos" ]]; then
+            if command -v brew >/dev/null 2>&1; then
+                if brew uninstall --cask chromium >/dev/null 2>&1; then
+                    print_success "Chromium 卸载成功"
+                    uninstalled=true
+                else
+                    print_warning "Chromium 卸载失败"
+                fi
+            fi
+        fi
+    fi
+
+    if [[ "$uninstalled" == "true" ]]; then
+        # 清理残留配置文件
+        print_info "清理浏览器配置文件..."
+        if [[ "$OS" != "windows" ]]; then
+            rm -rf "$HOME/.config/google-chrome" 2>/dev/null || true
+            rm -rf "$HOME/.config/chromium" 2>/dev/null || true
+            rm -rf "$HOME/.cache/google-chrome" 2>/dev/null || true
+            rm -rf "$HOME/.cache/chromium" 2>/dev/null || true
+        fi
+        print_success "浏览器卸载完成"
+    else
+        print_info "未找到需要卸载的浏览器"
+    fi
+
+    log "浏览器卸载完成"
+}
+
+# 安装Google Chrome
+install_google_chrome() {
+    print_step "安装 Google Chrome..."
+
+    if [[ "$OS" == "debian" ]]; then
+        print_info "下载并安装 Google Chrome (Debian/Ubuntu)..."
+
+        # 添加Google Chrome仓库
+        if ! grep -q "dl.google.com" /etc/apt/sources.list.d/google-chrome.list 2>/dev/null; then
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add - >/dev/null 2>&1
+            echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list >/dev/null
+            sudo apt-get update -qq
+        fi
+
+        if sudo apt-get install -y google-chrome-stable >/dev/null 2>&1; then
+            print_success "Google Chrome 安装成功"
+            return 0
+        else
+            print_warning "Google Chrome 安装失败，尝试安装 Chromium..."
+            if sudo apt-get install -y chromium-browser >/dev/null 2>&1; then
+                print_success "Chromium 安装成功"
+                return 0
+            else
+                print_error "浏览器安装失败"
+                return 1
+            fi
+        fi
+
+    elif [[ "$OS" == "redhat" ]]; then
+        print_info "下载并安装 Google Chrome (RedHat/CentOS)..."
+
+        # 创建Google Chrome仓库文件
+        if [[ ! -f /etc/yum.repos.d/google-chrome.repo ]]; then
+            sudo tee /etc/yum.repos.d/google-chrome.repo >/dev/null << EOF
+[google-chrome]
+name=google-chrome
+baseurl=http://dl.google.com/linux/chrome/rpm/stable/x86_64
+enabled=1
+gpgcheck=1
+gpgkey=https://dl.google.com/linux/linux_signing_key.pub
+EOF
+        fi
+
+        if sudo yum install -y google-chrome-stable >/dev/null 2>&1; then
+            print_success "Google Chrome 安装成功"
+            return 0
+        else
+            print_warning "Google Chrome 安装失败，尝试安装 Chromium..."
+            if sudo yum install -y chromium >/dev/null 2>&1; then
+                print_success "Chromium 安装成功"
+                return 0
+            else
+                print_error "浏览器安装失败"
+                return 1
+            fi
+        fi
+
+    elif [[ "$OS" == "macos" ]]; then
+        if command -v brew >/dev/null 2>&1; then
+            print_info "使用 Homebrew 安装 Google Chrome..."
+            if brew install --cask google-chrome >/dev/null 2>&1; then
+                print_success "Google Chrome 安装成功"
+                return 0
+            else
+                print_warning "Google Chrome 安装失败，尝试安装 Chromium..."
+                if brew install --cask chromium >/dev/null 2>&1; then
+                    print_success "Chromium 安装成功"
+                    return 0
+                else
+                    print_error "浏览器安装失败"
+                    return 1
+                fi
+            fi
+        else
+            print_warning "未安装 Homebrew，请手动下载安装 Chrome"
+            print_info "下载地址: https://www.google.com/chrome/"
+            return 1
+        fi
+
+    else
+        print_warning "不支持的系统，请手动安装 Chrome 或 Chromium"
+        return 1
+    fi
+}
+
 # 安装浏览器（可选）
 install_browser() {
     print_step "检查浏览器安装..."
 
+    local chrome_installed=false
+    local chrome_version=""
+
     # 检查是否已安装Chrome或Chromium
     if command -v google-chrome >/dev/null 2>&1; then
-        print_success "Google Chrome 已安装: $(google-chrome --version)"
-        return
+        chrome_version="Google Chrome: $(google-chrome --version)"
+        chrome_installed=true
+        print_success "$chrome_version"
     elif command -v chromium-browser >/dev/null 2>&1; then
-        print_success "Chromium 已安装: $(chromium-browser --version)"
-        return
+        chrome_version="Chromium: $(chromium-browser --version)"
+        chrome_installed=true
+        print_success "$chrome_version"
     elif command -v chromium >/dev/null 2>&1; then
-        print_success "Chromium 已安装: $(chromium --version)"
-        return
+        chrome_version="Chromium: $(chromium --version)"
+        chrome_installed=true
+        print_success "$chrome_version"
     fi
 
-    # 根据系统安装浏览器
+    # 如果已安装浏览器，询问是否卸载重装
+    if [[ "$chrome_installed" == "true" ]]; then
+        echo
+        print_info "检测到已安装的浏览器: $chrome_version"
+        print_step "Chrome/Chromium 管理选项："
+        echo "1. 保持当前安装（推荐）"
+        echo "2. 卸载并重新安装 Google Chrome"
+        echo "3. 卸载并重新安装 Chromium"
+        echo "4. 仅卸载，不重新安装"
+        echo
+
+        read -p "请选择操作 (1-4): " -n 1 -r
+        echo
+
+        case $REPLY in
+            1)
+                print_info "保持当前浏览器安装"
+                log "保持现有浏览器安装"
+                return
+                ;;
+            2)
+                print_info "卸载现有浏览器并安装 Google Chrome..."
+                uninstall_chrome
+                if install_google_chrome; then
+                    print_success "Google Chrome 重新安装完成"
+                else
+                    print_warning "Google Chrome 安装失败，脚本将使用无头模式"
+                fi
+                ;;
+            3)
+                print_info "卸载现有浏览器并安装 Chromium..."
+                uninstall_chrome
+                install_chromium_fallback
+                ;;
+            4)
+                print_info "仅卸载现有浏览器..."
+                uninstall_chrome
+                print_warning "浏览器已卸载，脚本将使用无头模式"
+                ;;
+            *)
+                print_warning "无效选择，保持当前安装"
+                ;;
+        esac
+    else
+        # 没有安装浏览器，询问是否安装
+        print_warning "未检测到 Chrome 或 Chromium 浏览器"
+        echo
+        print_step "浏览器安装选项："
+        echo "1. 安装 Google Chrome（推荐）"
+        echo "2. 安装 Chromium"
+        echo "3. 跳过安装（使用无头模式）"
+        echo
+
+        read -p "请选择安装选项 (1-3): " -n 1 -r
+        echo
+
+        case $REPLY in
+            1)
+                print_info "安装 Google Chrome..."
+                if install_google_chrome; then
+                    print_success "Google Chrome 安装完成"
+                else
+                    print_warning "Google Chrome 安装失败，脚本将使用无头模式"
+                fi
+                ;;
+            2)
+                print_info "安装 Chromium..."
+                install_chromium_fallback
+                ;;
+            3)
+                print_info "跳过浏览器安装，将使用无头模式"
+                ;;
+            *)
+                print_warning "无效选择，跳过浏览器安装"
+                ;;
+        esac
+    fi
+
+    log "浏览器检查完成"
+}
+
+# 安装Chromium（备用方案）
+install_chromium_fallback() {
+    print_info "安装 Chromium 浏览器..."
+
     if [[ "$OS" == "debian" ]]; then
-        print_info "尝试安装 Chromium 浏览器..."
         if sudo apt-get install -y chromium-browser >/dev/null 2>&1; then
             print_success "Chromium 安装成功"
         else
             print_warning "Chromium 安装失败，脚本将使用无头模式"
         fi
     elif [[ "$OS" == "redhat" ]]; then
-        print_info "尝试安装 Chromium 浏览器..."
         if sudo yum install -y chromium >/dev/null 2>&1; then
             print_success "Chromium 安装成功"
         else
@@ -458,7 +709,6 @@ install_browser() {
         fi
     elif [[ "$OS" == "macos" ]]; then
         if command -v brew >/dev/null 2>&1; then
-            print_info "尝试安装 Chromium 浏览器..."
             if brew install --cask chromium >/dev/null 2>&1; then
                 print_success "Chromium 安装成功"
             else
@@ -470,8 +720,6 @@ install_browser() {
     else
         print_warning "请确保系统已安装 Chrome 或 Chromium 浏览器"
     fi
-
-    log "浏览器检查完成"
 }
 
 # 创建Python虚拟环境
