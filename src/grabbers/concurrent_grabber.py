@@ -17,7 +17,7 @@ import os
 import random
 import queue
 from typing import Dict, Any, List
-from TimePinner import Pinner
+from ..utils.TimePinner import Pinner
 
 # 配置日志
 logging.basicConfig(

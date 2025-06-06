@@ -8,7 +8,7 @@ import time
 from DrissionPage import Chromium, ChromiumOptions
 from dotenv import load_dotenv
 import os
-from TimePinner import Pinner
+from ..utils.TimePinner import Pinner
 from typing import Dict, Any
 import random
 
