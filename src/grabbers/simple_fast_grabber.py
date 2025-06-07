@@ -38,26 +38,6 @@ def apply_headless_config(co, config: Dict[str, Any]):
     else:
         logging.info("使用有头模式")
 
-    # 设置自定义User-Agent（无头和有头模式都适用）
-    # custom_ua = config.get('CUSTOM_USER_AGENT', '')
-    # if custom_ua:
-    #     co.set_user_agent(custom_ua)
-    #     logging.info(f"已设置自定义User-Agent: {custom_ua}")
-    # else:
-    #     # 根据系统平台自动选择User-Agent
-    #     if platform == "linux" or platform == "linux2":
-    #         platformIdentifier = "X11; Linux x86_64"
-    #     elif platform == "darwin":
-    #         platformIdentifier = "Macintosh; Intel Mac OS X 10_15_7"
-    #     elif platform == "win32":
-    #         platformIdentifier = "Windows NT 10.0; Win64; x64"
-    #     else:
-    #         platformIdentifier = "Windows NT 10.0; Win64; x64"  # 默认使用Windows
-
-    #     default_ua = f"Mozilla/5.0 ({platformIdentifier}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-    #     co.set_user_agent(default_ua)
-    #     logging.info(f"已设置基于平台的User-Agent: {default_ua}")
-
     return co
 
 # 配置日志
@@ -82,7 +62,6 @@ def load_fast_config() -> Dict[str, Any]:
         'PASSWORD': os.getenv("PASSWORD"),
         'PROMO_CODE': os.getenv("PROMO_CODE", ""),
         'HEADLESS_MODE': os.getenv("HEADLESS_MODE", "True").lower() == "true",
-        'CUSTOM_USER_AGENT': os.getenv("CUSTOM_USER_AGENT", ""),
 
         # 优化的时间配置
         'DELAY_TIME': float(os.getenv("DELAY_TIME", "0.3")),
