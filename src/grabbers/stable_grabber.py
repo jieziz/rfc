@@ -31,7 +31,20 @@ def apply_headless_config(co, config: Dict[str, Any]):
         co.headless()
 
         # 添加无头模式必要参数
-        co.set_argument('--no-sandbox')
+        headless_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-extensions',
+            '--disable-setuid-sandbox',
+            '--single-process',
+            '--no-zygote',
+            '--window-size=1920,1080'
+        ]
+
+        for arg in headless_args:
+            co.set_argument(arg)
 
         logging.info("已启用无头模式")
     else:
@@ -121,18 +134,19 @@ def stable_login(page, config: Dict[str, Any]) -> bool:
         page.get(config['LOGIN_URL'])
         
         # 等待页面完全加载
-        time.sleep(3)
+        time.sleep(5)  # 增加等待时间
         
         # 检查是否已登录
         dashboard_indicators = [
             'text:Dashboard', 
             'text:My Dashboard', 
             '.dashboard',
-            'text:我的面板'
+            'text:我的面板',
+            'text:控制面板'
         ]
         
         for indicator in dashboard_indicators:
-            if page.s_ele(indicator, timeout=2):
+            if page.s_ele(indicator, timeout=5):  # 增加超时时间
                 logging.info("已经登录")
                 return True
         
@@ -150,21 +164,21 @@ def stable_login(page, config: Dict[str, Any]) -> bool:
 
             for selector in email_selectors:
                 try:
-                    element = page.s_ele(selector, timeout=3)
+                    element = page.s_ele(selector, timeout=5)  # 增加超时时间
                     if element:
                         logging.info(f"找到邮箱输入框: {selector}")
 
                         # 清空输入框
                         page(selector).clear()
-                        time.sleep(0.5)
+                        time.sleep(1)  # 增加等待时间
 
                         # 点击获得焦点
                         page(selector).click()
-                        time.sleep(0.5)
+                        time.sleep(1)  # 增加等待时间
 
                         # 输入邮箱
                         page(selector).input(config['EMAIL'])
-                        time.sleep(0.5)
+                        time.sleep(1)  # 增加等待时间
 
                         # 验证输入是否成功
                         current_value = page(selector).value
@@ -185,34 +199,13 @@ def stable_login(page, config: Dict[str, Any]) -> bool:
 
             if attempt < 2:
                 logging.warning(f"第 {attempt + 1} 次邮箱输入失败，重试...")
-                time.sleep(2)
+                time.sleep(3)  # 增加重试等待时间
 
         if not email_success:
             logging.error("邮箱输入失败")
-            # 输出页面信息用于调试
-            try:
-                current_url = page.url
-                page_title = page.title
-                logging.error(f"当前页面: {current_url}")
-                logging.error(f"页面标题: {page_title}")
-
-                # 查找所有输入框
-                all_inputs = page.eles('tag:input')
-                logging.error(f"页面上找到 {len(all_inputs)} 个输入框")
-                for i, inp in enumerate(all_inputs[:5]):  # 只显示前5个
-                    try:
-                        inp_type = inp.attr('type') or 'text'
-                        inp_name = inp.attr('name') or 'unknown'
-                        inp_id = inp.attr('id') or 'unknown'
-                        logging.error(f"  输入框 {i+1}: type={inp_type}, name={inp_name}, id={inp_id}")
-                    except:
-                        pass
-            except Exception as e:
-                logging.error(f"获取调试信息失败: {e}")
-
             return False
         
-        time.sleep(1)
+        time.sleep(2)  # 增加等待时间
         
         # 输入密码 - 多次尝试
         password_success = False
@@ -221,21 +214,21 @@ def stable_login(page, config: Dict[str, Any]) -> bool:
 
             for selector in password_selectors:
                 try:
-                    element = page.s_ele(selector, timeout=3)
+                    element = page.s_ele(selector, timeout=5)  # 增加超时时间
                     if element:
                         logging.info(f"找到密码输入框: {selector}")
 
                         # 清空输入框
                         page(selector).clear()
-                        time.sleep(0.5)
+                        time.sleep(1)  # 增加等待时间
 
                         # 点击获得焦点
                         page(selector).click()
-                        time.sleep(0.5)
+                        time.sleep(1)  # 增加等待时间
 
                         # 输入密码
                         page(selector).input(config['PASSWORD'])
-                        time.sleep(0.5)
+                        time.sleep(1)  # 增加等待时间
 
                         # 验证输入是否成功（密码框通常不能读取值，所以只检查是否有值）
                         try:
@@ -260,20 +253,20 @@ def stable_login(page, config: Dict[str, Any]) -> bool:
 
             if attempt < 2:
                 logging.warning(f"第 {attempt + 1} 次密码输入失败，重试...")
-                time.sleep(2)
+                time.sleep(3)  # 增加重试等待时间
 
         if not password_success:
             logging.error("密码输入失败")
             return False
         
-        time.sleep(1)
+        time.sleep(2)  # 增加等待时间
         
         # 点击登录按钮 - 多次尝试
         login_success = False
         for attempt in range(3):
             for selector in login_selectors:
                 try:
-                    element = page.s_ele(selector, timeout=3)
+                    element = page.s_ele(selector, timeout=5)  # 增加超时时间
                     if element:
                         page(selector).click()
                         logging.info(f"点击登录按钮: {selector}")
@@ -288,7 +281,7 @@ def stable_login(page, config: Dict[str, Any]) -> bool:
             
             if attempt < 2:
                 logging.warning(f"第 {attempt + 1} 次登录点击失败，重试...")
-                time.sleep(2)
+                time.sleep(3)  # 增加重试等待时间
         
         if not login_success:
             logging.error("登录按钮点击失败")
@@ -296,11 +289,11 @@ def stable_login(page, config: Dict[str, Any]) -> bool:
         
         # 等待登录完成
         logging.info("等待登录处理...")
-        time.sleep(5)
+        time.sleep(10)  # 增加登录等待时间
         
         # 验证登录结果
         for indicator in dashboard_indicators:
-            if page.s_ele(indicator, timeout=5):
+            if page.s_ele(indicator, timeout=10):  # 增加超时时间
                 logging.info("登录成功确认")
                 return True
         
@@ -315,9 +308,15 @@ def stable_login(page, config: Dict[str, Any]) -> bool:
         ]
         
         for indicator in error_indicators:
-            if page.s_ele(indicator, timeout=2):
+            if page.s_ele(indicator, timeout=5):
                 logging.error(f"登录失败，检测到错误: {indicator}")
                 return False
+        
+        # 检查当前URL
+        current_url = page.url
+        if 'clientarea.php' in current_url or 'dashboard' in current_url.lower():
+            logging.info("通过URL确认登录成功")
+            return True
         
         logging.warning("登录状态不明确，假设成功")
         return True
